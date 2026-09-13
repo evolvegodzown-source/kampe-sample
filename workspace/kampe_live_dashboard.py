@@ -84,6 +84,7 @@ def resolve_columns():
     mapping = {
         "name_expr": name_expr,
         "phone": pick(bcols, ["phone_number", "phone", "phone_no", "mobile"]),
+        "email": pick(bcols, ["email", "email_address", "mail"]),
         "plan": pick(bcols, ["plan_name", "plan", "package_name"]),
         "status": pick(bcols, ["policy_status", "status", "enrollment_status", "state"]),
         "pharmacy_fk": pick(bcols, ["primary_pharmacy_id", "primary_pharmacy"]),
@@ -101,31 +102,53 @@ def status_clause(status_col, statuses):
     }
 
 
+# Test/junk enrollees removed from every count: yopmail emails and pharmacy id 1225
+EXCLUDED_EMAIL_PATTERN = "%yopmail%"
+EXCLUDED_PHARMACY_ID = "1225"
+
+
+def exclusion_clause(cols, alias=""):
+    """SQL fragment + params excluding junk enrollees from all queries."""
+    parts, params = [], {}
+    if cols["email"]:
+        parts.append(f"COALESCE({alias}{cols['email']}::text, '') ILIKE %(excl_email)s")
+        params["excl_email"] = EXCLUDED_EMAIL_PATTERN
+    if cols["pharmacy_fk"]:
+        parts.append(f"COALESCE({alias}{cols['pharmacy_fk']}::text, '') = %(excl_pharmacy)s")
+        params["excl_pharmacy"] = EXCLUDED_PHARMACY_ID
+    if not parts:
+        return "", {}
+    return " AND NOT (" + " OR ".join(parts) + ")", params
+
+
 # ── Data fetchers (short TTL keeps the dashboard "live") ─────────────────────
 @st.cache_data(ttl=REFRESH_SECONDS, show_spinner=False)
-def fetch_dates():
+def fetch_dates(cols):
+    excl, excl_params = exclusion_clause(cols)
     df = run_query(
-        """
+        f"""
         SELECT DISTINCT created_at::date AS d
         FROM company_beneficiary
-        WHERE created_at IS NOT NULL
+        WHERE created_at IS NOT NULL{excl}
         ORDER BY d DESC
-        """
+        """,
+        excl_params,
     )
     return [pd.to_datetime(d).date() for d in df["d"]]
 
 
 @st.cache_data(ttl=REFRESH_SECONDS, show_spinner=False)
-def fetch_hourly(day, status_col, statuses):
-    clause, extra = status_clause(status_col, statuses)
+def fetch_hourly(day, cols, statuses):
+    clause, extra = status_clause(cols["status"], statuses)
+    excl, excl_params = exclusion_clause(cols)
     df = run_query(
         f"""
         SELECT EXTRACT(HOUR FROM created_at)::int AS hour, COUNT(*) AS enrolments
         FROM company_beneficiary
-        WHERE created_at::date = %(day)s{clause}
+        WHERE created_at::date = %(day)s{clause}{excl}
         GROUP BY hour
         """,
-        {"day": day, **extra},
+        {"day": day, **extra, **excl_params},
     )
     full = pd.DataFrame({"hour": range(24)})
     full = full.merge(df, on="hour", how="left").fillna({"enrolments": 0})
@@ -136,35 +159,39 @@ def fetch_hourly(day, status_col, statuses):
 
 
 @st.cache_data(ttl=REFRESH_SECONDS, show_spinner=False)
-def fetch_statuses(status_col):
-    if not status_col:
+def fetch_statuses(cols):
+    if not cols["status"]:
         return []
+    excl, excl_params = exclusion_clause(cols)
     df = run_query(
         f"""
-        SELECT COALESCE(NULLIF({status_col}::text, ''), 'Unknown') AS status, COUNT(*) AS n
+        SELECT COALESCE(NULLIF({cols['status']}::text, ''), 'Unknown') AS status, COUNT(*) AS n
         FROM company_beneficiary
+        WHERE TRUE{excl}
         GROUP BY 1
         ORDER BY n DESC
-        """
+        """,
+        excl_params,
     )
     return df["status"].tolist()
 
 
 @st.cache_data(ttl=REFRESH_SECONDS, show_spinner=False)
-def fetch_plan_distribution(day, plan_col, status_col, statuses):
-    if not plan_col:
+def fetch_plan_distribution(day, cols, statuses):
+    if not cols["plan"]:
         return pd.DataFrame(columns=["plan_name", "enrolments"])
-    clause, extra = status_clause(status_col, statuses)
+    clause, extra = status_clause(cols["status"], statuses)
+    excl, excl_params = exclusion_clause(cols)
     df = run_query(
         f"""
-        SELECT COALESCE(NULLIF({plan_col}::text, ''), 'Unknown') AS plan_name,
+        SELECT COALESCE(NULLIF({cols['plan']}::text, ''), 'Unknown') AS plan_name,
                COUNT(*) AS enrolments
         FROM company_beneficiary
-        WHERE created_at::date = %(day)s{clause}
+        WHERE created_at::date = %(day)s{clause}{excl}
         GROUP BY 1
         ORDER BY enrolments DESC
         """,
-        {"day": day, **extra},
+        {"day": day, **extra, **excl_params},
     )
     return df
 
@@ -176,6 +203,7 @@ def fetch_ledger(day, cols, statuses):
     plan = f"b.{cols['plan']}" if cols["plan"] else "NULL"
     status = f"b.{cols['status']}" if cols["status"] else "NULL"
     clause, extra = status_clause(f"b.{cols['status']}" if cols["status"] else None, statuses)
+    excl, excl_params = exclusion_clause(cols, alias="b.")
     ph_fk = cols["pharmacy_fk"]
     if ph_fk and cols["pharmacy_name"]:
         ph_select = f"b.{ph_fk}"
@@ -194,16 +222,21 @@ def fetch_ledger(day, cols, statuses):
                b.created_at             AS enrolled_at
         FROM company_beneficiary b
         {join}
-        WHERE b.created_at::date = %(day)s{clause}
+        WHERE b.created_at::date = %(day)s{clause}{excl}
         ORDER BY b.created_at
         """,
-        {"day": day, **extra},
+        {"day": day, **extra, **excl_params},
     )
 
 
 @st.cache_data(ttl=REFRESH_SECONDS, show_spinner=False)
-def fetch_alltime_total():
-    return int(run_query("SELECT COUNT(*) AS n FROM company_beneficiary")["n"][0])
+def fetch_alltime_total(cols):
+    excl, excl_params = exclusion_clause(cols)
+    df = run_query(
+        f"SELECT COUNT(*) AS n FROM company_beneficiary WHERE TRUE{excl}",
+        excl_params,
+    )
+    return int(df["n"][0])
 
 
 # ── Page ─────────────────────────────────────────────────────────────────────
@@ -254,10 +287,13 @@ def render_logo_strip():
 def render():
     render_logo_strip()
     st.title("Kampe Beneficiary Enrollment")
-    st.caption("Live view of hourly beneficiary enrollments from the Kampe database")
+    st.caption(
+        "Live view of hourly beneficiary enrollments from the Kampe database · "
+        "excludes yopmail test emails and primary pharmacy 1225"
+    )
 
     cols = resolve_columns()
-    dates = fetch_dates()
+    dates = fetch_dates(cols)
     if not dates:
         st.warning("No enrolments found in `company_beneficiary` yet.")
         return
@@ -269,7 +305,7 @@ def render():
     )
 
     # Policy-status filter (inactive included; empty selection = all statuses)
-    all_statuses = fetch_statuses(cols["status"])
+    all_statuses = fetch_statuses(cols)
     if all_statuses:
         picked = st.multiselect(
             "Policy status",
@@ -282,8 +318,8 @@ def render():
         statuses = ()
         st.caption("No policy-status column found on `company_beneficiary` — showing all beneficiaries.")
 
-    hourly = fetch_hourly(selected, cols["status"], statuses)
-    plans = fetch_plan_distribution(selected, cols["plan"], cols["status"], statuses)
+    hourly = fetch_hourly(selected, cols, statuses)
+    plans = fetch_plan_distribution(selected, cols, statuses)
     ledger = fetch_ledger(selected, cols, statuses)
 
     total_day = int(hourly["enrolments"].sum())
@@ -307,7 +343,7 @@ def render():
         top_plan["plan_name"] if top_plan is not None else "—",
         f"{int(top_plan['enrolments']):,} enrolments" if top_plan is not None else None,
     )
-    k5.metric("All-Time Enrollees", f"{fetch_alltime_total():,}")
+    k5.metric("All-Time Enrollees", f"{fetch_alltime_total(cols):,}")
 
     st.divider()
 
