@@ -85,7 +85,9 @@ def resolve_columns():
         "name_expr": name_expr,
         "phone": pick(bcols, ["phone_number", "phone", "phone_no", "mobile"]),
         "email": pick(bcols, ["email", "email_address", "mail"]),
+        "last_name": pick(bcols, ["last_name", "surname", "family_name"]),
         "plan": pick(bcols, ["plan_name", "plan", "package_name"]),
+        "policy": pick(bcols, ["policy_name", "policy"]),
         "status": pick(bcols, ["policy_status", "status", "enrollment_status", "state"]),
         "pharmacy_fk": pick(bcols, ["primary_pharmacy_id", "primary_pharmacy"]),
         "pharmacy_name": pick(pcols, ["name", "pharmacy_name", "title"]),
@@ -102,9 +104,12 @@ def status_clause(status_col, statuses):
     }
 
 
-# Test/junk enrollees removed from every count: yopmail emails and pharmacy id 1225
+# Test/junk enrollees removed from every count: yopmail emails, pharmacy id 1225,
+# last name "doe", policy names containing "azzez sanni", blank policy names
 EXCLUDED_EMAIL_PATTERN = "%yopmail%"
 EXCLUDED_PHARMACY_ID = "1225"
+EXCLUDED_LAST_NAME = "doe"
+EXCLUDED_POLICY_PATTERN = "%azzez%sanni%"
 
 
 def exclusion_clause(cols, alias=""):
@@ -116,6 +121,14 @@ def exclusion_clause(cols, alias=""):
     if cols["pharmacy_fk"]:
         parts.append(f"COALESCE({alias}{cols['pharmacy_fk']}::text, '') = %(excl_pharmacy)s")
         params["excl_pharmacy"] = EXCLUDED_PHARMACY_ID
+    if cols["last_name"]:
+        parts.append(f"LOWER(TRIM({alias}{cols['last_name']}::text)) = %(excl_last_name)s")
+        params["excl_last_name"] = EXCLUDED_LAST_NAME
+    policy_col = cols["policy"] or cols["plan"]
+    if policy_col:
+        parts.append(f"{alias}{policy_col}::text ILIKE %(excl_policy)s")
+        params["excl_policy"] = EXCLUDED_POLICY_PATTERN
+        parts.append(f"NULLIF(TRIM({alias}{policy_col}::text), '') IS NULL")
     if not parts:
         return "", {}
     return " AND NOT (" + " OR ".join(parts) + ")", params
@@ -251,7 +264,16 @@ st.markdown(
         border-radius: 12px; padding: 16px 20px;
       }
       [data-testid="stMetricLabel"] { color: #d18aad; }
-      [data-testid="stMetricValue"] { color: #ff5fa8; }
+      [data-testid="stMetricValue"] { color: #ff5fa8; font-size: 1.5rem; }
+      [data-testid="stMetricLabel"] > div,
+      [data-testid="stMetricValue"] > div,
+      [data-testid="stMetricDelta"] > div {
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        overflow-wrap: anywhere;
+        line-height: 1.25;
+      }
       h1, h2, h3 { color: #ff8fc2; }
       hr { border-color: #5a1f42; }
       .logo-strip {
@@ -289,7 +311,8 @@ def render():
     st.title("Kampe Beneficiary Enrollment")
     st.caption(
         "Live view of hourly beneficiary enrollments from the Kampe database · "
-        "excludes yopmail test emails and primary pharmacy 1225"
+        "excludes yopmail test emails, pharmacy 1225, last name “doe”, "
+        "“azzez sanni” and blank policy names"
     )
 
     cols = resolve_columns()
