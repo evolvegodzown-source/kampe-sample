@@ -109,7 +109,7 @@ def status_clause(status_col, statuses):
 EXCLUDED_EMAIL_PATTERN = "%yopmail%"
 EXCLUDED_PHARMACY_ID = "1225"
 EXCLUDED_LAST_NAME = "doe"
-EXCLUDED_POLICY_PATTERN = "%azzez%sanni%"
+EXCLUDED_POLICY_PATTERN = "%azeez%sanni%"
 
 
 def exclusion_clause(cols, alias=""):
