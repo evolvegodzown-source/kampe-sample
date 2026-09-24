@@ -12,6 +12,7 @@ On Streamlit Community Cloud, put the same block in the app's Secrets settings.
 Run:  streamlit run kampe_live_dashboard.py
 """
 
+from datetime import timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -151,17 +152,17 @@ def fetch_dates(cols):
 
 
 @st.cache_data(ttl=REFRESH_SECONDS, show_spinner=False)
-def fetch_hourly(day, cols, statuses):
+def fetch_hourly(days, cols, statuses):
     clause, extra = status_clause(cols["status"], statuses)
     excl, excl_params = exclusion_clause(cols)
     df = run_query(
         f"""
         SELECT EXTRACT(HOUR FROM created_at)::int AS hour, COUNT(*) AS enrolments
         FROM company_beneficiary
-        WHERE created_at::date = %(day)s{clause}{excl}
+        WHERE created_at::date = ANY(%(days)s){clause}{excl}
         GROUP BY hour
         """,
-        {"day": day, **extra, **excl_params},
+        {"days": list(days), **extra, **excl_params},
     )
     full = pd.DataFrame({"hour": range(24)})
     full = full.merge(df, on="hour", how="left").fillna({"enrolments": 0})
@@ -190,7 +191,7 @@ def fetch_statuses(cols):
 
 
 @st.cache_data(ttl=REFRESH_SECONDS, show_spinner=False)
-def fetch_plan_distribution(day, cols, statuses):
+def fetch_plan_distribution(days, cols, statuses):
     if not cols["plan"]:
         return pd.DataFrame(columns=["plan_name", "enrolments"])
     clause, extra = status_clause(cols["status"], statuses)
@@ -200,17 +201,17 @@ def fetch_plan_distribution(day, cols, statuses):
         SELECT COALESCE(NULLIF({cols['plan']}::text, ''), 'Unknown') AS plan_name,
                COUNT(*) AS enrolments
         FROM company_beneficiary
-        WHERE created_at::date = %(day)s{clause}{excl}
+        WHERE created_at::date = ANY(%(days)s){clause}{excl}
         GROUP BY 1
         ORDER BY enrolments DESC
         """,
-        {"day": day, **extra, **excl_params},
+        {"days": list(days), **extra, **excl_params},
     )
     return df
 
 
 @st.cache_data(ttl=REFRESH_SECONDS, show_spinner=False)
-def fetch_ledger(day, cols, statuses):
+def fetch_ledger(days, cols, statuses):
     name_expr = cols["name_expr"]
     phone = f"b.{cols['phone']}" if cols["phone"] else "NULL"
     plan = f"b.{cols['plan']}" if cols["plan"] else "NULL"
@@ -235,10 +236,10 @@ def fetch_ledger(day, cols, statuses):
                b.created_at             AS enrolled_at
         FROM company_beneficiary b
         {join}
-        WHERE b.created_at::date = %(day)s{clause}{excl}
+        WHERE b.created_at::date = ANY(%(days)s){clause}{excl}
         ORDER BY b.created_at
         """,
-        {"day": day, **extra, **excl_params},
+        {"days": list(days), **extra, **excl_params},
     )
 
 
@@ -321,11 +322,34 @@ def render():
         st.warning("No enrolments found in `company_beneficiary` yet.")
         return
 
-    selected = st.selectbox(
-        "Enrollment date",
-        dates,
-        format_func=lambda d: pd.Timestamp(d).strftime("%A, %d %B %Y"),
+    # ── Week filter: business weeks run Monday to Saturday ──
+    weeks: dict[tuple[int, int], list] = {}
+    for d in dates:
+        iso_year, iso_week, _ = d.isocalendar()
+        weeks.setdefault((iso_year, iso_week), []).append(d)
+
+    def week_label(key):
+        iso_year, iso_week = key
+        monday = weeks[key][0] - timedelta(days=weeks[key][0].weekday())
+        saturday = monday + timedelta(days=5)
+        return f"W{iso_week:02d} · {monday.strftime('%d %b')} – {saturday.strftime('%d %b %Y')}"
+
+    week_options = ["All weeks"] + sorted(weeks.keys(), reverse=True)
+    week_choice = st.selectbox("Week", week_options, format_func=lambda k: "All weeks" if k == "All weeks" else week_label(k))
+    available_days = dates if week_choice == "All weeks" else weeks[week_choice]
+
+    # ── Days calendar: pick one or more enrollment days ──
+    picked_days = st.multiselect(
+        "Enrollment days",
+        available_days,
+        default=available_days[:1],
+        format_func=lambda d: pd.Timestamp(d).strftime("%a, %d %B %Y"),
+        help="Select one or more days; every chart and the ledger aggregate the selected days.",
     )
+    if not picked_days:
+        st.info("Pick at least one enrollment day to see the dashboard.")
+        return
+    selected_days = tuple(sorted(picked_days))
 
     # Policy-status filter (inactive included; empty selection = all statuses)
     all_statuses = fetch_statuses(cols)
@@ -341,9 +365,9 @@ def render():
         statuses = ()
         st.caption("No policy-status column found on `company_beneficiary` — showing all beneficiaries.")
 
-    hourly = fetch_hourly(selected, cols, statuses)
-    plans = fetch_plan_distribution(selected, cols, statuses)
-    ledger = fetch_ledger(selected, cols, statuses)
+    hourly = fetch_hourly(selected_days, cols, statuses)
+    plans = fetch_plan_distribution(selected_days, cols, statuses)
+    ledger = fetch_ledger(selected_days, cols, statuses)
 
     total_day = int(hourly["enrolments"].sum())
     peak_row = hourly.loc[hourly["enrolments"].idxmax()]
@@ -353,8 +377,14 @@ def render():
     if all_statuses and picked and len(picked) < len(all_statuses):
         filter_note = f"filtered: {', '.join(picked)}"
 
+    day_span = (
+        selected_days[0].strftime("%d %b %Y")
+        if len(selected_days) == 1
+        else f"{selected_days[0].strftime('%d %b')} – {selected_days[-1].strftime('%d %b %Y')} ({len(selected_days)} days)"
+    )
+
     k1, k2, k3, k4, k5 = st.columns(5)
-    k1.metric("Total Beneficiaries (day)", f"{total_day:,}", filter_note)
+    k1.metric(f"Total Beneficiaries ({day_span})", f"{total_day:,}", filter_note)
     k2.metric(
         "Peak Hour",
         peak_row["label"] if total_day else "—",
@@ -388,9 +418,21 @@ def render():
                 width="stretch",
             )
         else:
-            st.info("No plan data for this date.")
+            st.info("No plan data for the selected day(s).")
 
     st.subheader("Enrollment Ledger")
+    dl_col, count_col = st.columns([1, 4])
+    with dl_col:
+        st.download_button(
+            "⬇ Download CSV",
+            data=ledger.to_csv(index=False).encode("utf-8-sig"),
+            file_name=f"kampe_ledger_{selected_days[0]}_to_{selected_days[-1]}.csv",
+            mime="text/csv",
+            use_container_width=True,
+            help="Download the full ledger for the selected days as a CSV (opens cleanly in Excel).",
+        )
+    with count_col:
+        st.caption(f"{len(ledger):,} rows · {day_span}")
     st.dataframe(
         ledger,
         width="stretch",
@@ -402,7 +444,7 @@ def render():
             "policy_status": "Policy Status",
             "primary_pharmacy_id": "Primary Pharmacy ID",
             "pharmacy_name": "Pharmacy Name",
-            "enrolled_at": st.column_config.DatetimeColumn("Enrolled At", format="hh:mm A"),
+            "enrolled_at": st.column_config.DatetimeColumn("Enrolled At", format="DD MMM YYYY, hh:mm A"),
         },
     )
     st.caption(f"Last refreshed: {pd.Timestamp.now().strftime('%H:%M:%S')}")
