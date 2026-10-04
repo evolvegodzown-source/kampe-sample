@@ -322,21 +322,56 @@ def render():
         st.warning("No enrolments found in `company_beneficiary` yet.")
         return
 
-    # ── Week filter: business weeks run Monday to Saturday ──
+    # ── Quarter & Week mappings ──
+    quarters: dict[tuple[int, int], list] = {}
     weeks: dict[tuple[int, int], list] = {}
+    
     for d in dates:
+        year = d.year
+        quarter = (d.month - 1) // 3 + 1
         iso_year, iso_week, _ = d.isocalendar()
+        
+        quarters.setdefault((year, quarter), []).append(d)
         weeks.setdefault((iso_year, iso_week), []).append(d)
+
+    filter_col1, filter_col2 = st.columns(2)
+
+    # ── Quarter filter ──
+    with filter_col1:
+        quarter_options = ["All quarters"] + sorted(quarters.keys(), reverse=True)
+        quarter_choice = st.selectbox(
+            "Quarter",
+            quarter_options,
+            format_func=lambda k: "All quarters" if k == "All quarters" else f"Q{k[1]} {k[0]}"
+        )
+
+    dates_in_quarter = dates if quarter_choice == "All quarters" else quarters[quarter_choice]
+
+    # Filter weeks based on selected quarter
+    available_weeks = {
+        key: days for key, days in weeks.items()
+        if any(d in dates_in_quarter for d in days)
+    }
 
     def week_label(key):
         iso_year, iso_week = key
-        monday = weeks[key][0] - timedelta(days=weeks[key][0].weekday())
+        monday = available_weeks[key][0] - timedelta(days=available_weeks[key][0].weekday())
         saturday = monday + timedelta(days=5)
         return f"W{iso_week:02d} · {monday.strftime('%d %b')} – {saturday.strftime('%d %b %Y')}"
 
-    week_options = ["All weeks"] + sorted(weeks.keys(), reverse=True)
-    week_choice = st.selectbox("Week", week_options, format_func=lambda k: "All weeks" if k == "All weeks" else week_label(k))
-    available_days = dates if week_choice == "All weeks" else weeks[week_choice]
+    # ── Week filter ──
+    with filter_col2:
+        week_options = ["All weeks"] + sorted(available_weeks.keys(), reverse=True)
+        week_choice = st.selectbox(
+            "Week",
+            week_options,
+            format_func=lambda k: "All weeks" if k == "All weeks" else week_label(k)
+        )
+
+    if week_choice == "All weeks":
+        available_days = dates_in_quarter
+    else:
+        available_days = [d for d in available_weeks[week_choice] if d in dates_in_quarter]
 
     # ── Days calendar: pick one or more enrollment days ──
     picked_days = st.multiselect(
