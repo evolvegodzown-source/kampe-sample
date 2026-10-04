@@ -12,7 +12,6 @@ On Streamlit Community Cloud, put the same block in the app's Secrets settings.
 Run:  streamlit run kampe_live_dashboard.py
 """
 
-from datetime import timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -322,17 +321,17 @@ def render():
         st.warning("No enrolments found in `company_beneficiary` yet.")
         return
 
-    # ── Quarter & Week mappings ──
+    # ── Quarter & Month mappings ──
     quarters: dict[tuple[int, int], list] = {}
-    weeks: dict[tuple[int, int], list] = {}
-    
+    months: dict[tuple[int, int], list] = {}
+
     for d in dates:
         year = d.year
         quarter = (d.month - 1) // 3 + 1
-        iso_year, iso_week, _ = d.isocalendar()
-        
+        month = d.month
+
         quarters.setdefault((year, quarter), []).append(d)
-        weeks.setdefault((iso_year, iso_week), []).append(d)
+        months.setdefault((year, month), []).append(d)
 
     filter_col1, filter_col2 = st.columns(2)
 
@@ -342,49 +341,39 @@ def render():
         quarter_choice = st.selectbox(
             "Quarter",
             quarter_options,
-            format_func=lambda k: "All quarters" if k == "All quarters" else f"Q{k[1]} {k[0]}"
+            format_func=lambda k: "All quarters" if k == "All quarters" else f"Q{k[1]} {k[0]}",
         )
 
     dates_in_quarter = dates if quarter_choice == "All quarters" else quarters[quarter_choice]
 
-    # Filter weeks based on selected quarter
-    available_weeks = {
-        key: days for key, days in weeks.items()
+    # Filter months based on selected quarter
+    available_months = {
+        key: days for key, days in months.items()
         if any(d in dates_in_quarter for d in days)
     }
 
-    def week_label(key):
-        iso_year, iso_week = key
-        monday = available_weeks[key][0] - timedelta(days=available_weeks[key][0].weekday())
-        saturday = monday + timedelta(days=5)
-        return f"W{iso_week:02d} · {monday.strftime('%d %b')} – {saturday.strftime('%d %b %Y')}"
+    def month_label(key):
+        year, month = key
+        first_day = available_months[key][0]
+        return pd.Timestamp(first_day).strftime("%B %Y")
 
-    # ── Week filter ──
+    # ── Month filter ──
     with filter_col2:
-        week_options = ["All weeks"] + sorted(available_weeks.keys(), reverse=True)
-        week_choice = st.selectbox(
-            "Week",
-            week_options,
-            format_func=lambda k: "All weeks" if k == "All weeks" else week_label(k)
+        month_options = ["All months"] + sorted(available_months.keys(), reverse=True)
+        month_choice = st.selectbox(
+            "Month",
+            month_options,
+            format_func=lambda k: "All months" if k == "All months" else month_label(k),
         )
 
-    if week_choice == "All weeks":
-        available_days = dates_in_quarter
+    if month_choice == "All months":
+        selected_days = tuple(sorted(dates_in_quarter))
     else:
-        available_days = [d for d in available_weeks[week_choice] if d in dates_in_quarter]
+        selected_days = tuple(sorted([d for d in available_months[month_choice] if d in dates_in_quarter]))
 
-    # ── Days calendar: pick one or more enrollment days ──
-    picked_days = st.multiselect(
-        "Enrollment days",
-        available_days,
-        default=available_days[:1],
-        format_func=lambda d: pd.Timestamp(d).strftime("%a, %d %B %Y"),
-        help="Select one or more days; every chart and the ledger aggregate the selected days.",
-    )
-    if not picked_days:
-        st.info("Pick at least one enrollment day to see the dashboard.")
+    if not selected_days:
+        st.info("No enrollment data found for the selected period.")
         return
-    selected_days = tuple(sorted(picked_days))
 
     # Policy-status filter (inactive included; empty selection = all statuses)
     all_statuses = fetch_statuses(cols)
@@ -412,14 +401,14 @@ def render():
     if all_statuses and picked and len(picked) < len(all_statuses):
         filter_note = f"filtered: {', '.join(picked)}"
 
-    day_span = (
-        selected_days[0].strftime("%d %b %Y")
-        if len(selected_days) == 1
-        else f"{selected_days[0].strftime('%d %b')} – {selected_days[-1].strftime('%d %b %Y')} ({len(selected_days)} days)"
+    month_span = (
+        pd.Timestamp(selected_days[0]).strftime("%B %Y")
+        if month_choice != "All months"
+        else f"{selected_days[0].strftime('%b %Y')} – {selected_days[-1].strftime('%b %Y')}"
     )
 
     k1, k2, k3, k4, k5 = st.columns(5)
-    k1.metric(f"Total Beneficiaries ({day_span})", f"{total_day:,}", filter_note)
+    k1.metric(f"Total Beneficiaries ({month_span})", f"{total_day:,}", filter_note)
     k2.metric(
         "Peak Hour",
         peak_row["label"] if total_day else "—",
@@ -453,7 +442,7 @@ def render():
                 width="stretch",
             )
         else:
-            st.info("No plan data for the selected day(s).")
+            st.info("No plan data for the selected period.")
 
     st.subheader("Enrollment Ledger")
     dl_col, count_col = st.columns([1, 4])
@@ -464,10 +453,10 @@ def render():
             file_name=f"kampe_ledger_{selected_days[0]}_to_{selected_days[-1]}.csv",
             mime="text/csv",
             use_container_width=True,
-            help="Download the full ledger for the selected days as a CSV (opens cleanly in Excel).",
+            help="Download the full ledger for the selected period as a CSV (opens cleanly in Excel).",
         )
     with count_col:
-        st.caption(f"{len(ledger):,} rows · {day_span}")
+        st.caption(f"{len(ledger):,} rows · {month_span}")
     st.dataframe(
         ledger,
         width="stretch",
