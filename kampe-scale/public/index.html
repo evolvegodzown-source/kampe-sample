@@ -168,6 +168,45 @@ footer{text-align:center;font-size:11px;color:var(--muted);padding:18px 0 26px}
 </head>
 <body>
 
+<!-- Login gate: static client-side check, session-only -->
+<div id="loginOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:linear-gradient(160deg,var(--pink-50) 0%,#fff 55%,var(--pink-100) 100%);align-items:center;justify-content:center;font-family:Montserrat,'Segoe UI',system-ui,sans-serif;">
+  <form id="loginForm" style="background:#fff;border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:36px 40px;width:340px;text-align:center;">
+    <img src="assets/kampe_logo_white.png" alt="Kampe" style="width:120px;border-radius:14px;background:linear-gradient(120deg,var(--pink-700),var(--pink-500));padding:10px;margin-bottom:18px;">
+    <h2 style="margin:0 0 6px;color:var(--ink);font-size:1.25rem;">Kampe Scale Dashboard</h2>
+    <p style="margin:0 0 20px;color:var(--muted);font-size:.85rem;">Sign in to continue</p>
+    <input id="loginUser" autocomplete="username" placeholder="Username" style="width:100%;box-sizing:border-box;margin-bottom:12px;padding:11px 13px;border:1px solid var(--line);border-radius:10px;font-size:.95rem;outline:none;">
+    <input id="loginPass" type="password" autocomplete="current-password" placeholder="Password" style="width:100%;box-sizing:border-box;margin-bottom:16px;padding:11px 13px;border:1px solid var(--line);border-radius:10px;font-size:.95rem;outline:none;">
+    <div id="loginError" style="display:none;color:var(--pink-600);font-size:.82rem;margin-bottom:12px;">Incorrect username or password.</div>
+    <button type="submit" style="width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(120deg,var(--pink-700),var(--pink-500));color:#fff;font-weight:700;font-size:.95rem;cursor:pointer;">Sign in</button>
+  </form>
+</div>
+<script>
+(function () {
+  var USER = 'kampe', PASS = 'kampe123', KEY = 'kampe_auth';
+  var overlay = document.getElementById('loginOverlay');
+  function show() {
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+  }
+  function hide() {
+    overlay.style.display = 'none';
+    document.body.style.overflow = '';
+  }
+  if (sessionStorage.getItem(KEY) !== '1') show();
+  document.getElementById('loginForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var u = document.getElementById('loginUser').value.trim();
+    var p = document.getElementById('loginPass').value;
+    if (u === USER && p === PASS) {
+      sessionStorage.setItem(KEY, '1');
+      hide();
+    } else {
+      document.getElementById('loginError').style.display = 'block';
+    }
+  });
+})();
+</script>
+
 <header>
   <div class="brand">
     <img src="assets/kampe_logo_white.png" alt="Kampe">
