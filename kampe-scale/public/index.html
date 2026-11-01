@@ -1,0 +1,1884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kampe Scale Dashboard</title>
+<style>
+:root{
+  --pink-900:#5C0F2F; --pink-700:#8E1E4F; --pink-600:#B0225F; --pink-500:#D6336C;
+  --pink-300:#F2A0C0; --pink-100:#FBDCE9; --pink-50:#FDF3F7;
+  --ink:#3D0A1E; --muted:#9C5A76; --card:#ffffff; --line:#F3D3E0;
+  --shadow:0 10px 30px rgba(179,34,95,.10);
+  --radius:18px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Montserrat","Segoe UI",system-ui,sans-serif;background:linear-gradient(160deg,var(--pink-50) 0%,#fff 55%,var(--pink-100) 100%);color:var(--ink);min-height:100vh}
+
+/* ---------- Header ---------- */
+header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 28px;background:linear-gradient(120deg,var(--pink-700),var(--pink-500));color:#fff;box-shadow:var(--shadow);flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:14px}
+.brand img{height:40px}
+.brand h1{font-size:20px;font-weight:800;letter-spacing:.4px}
+.brand small{display:block;font-size:11px;font-weight:500;opacity:.85;letter-spacing:1.2px;text-transform:uppercase}
+.partners{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.partners img{height:26px;filter:brightness(0) invert(1);opacity:.92}
+.partners img.no-invert{filter:none;background:#fff;padding:3px 8px;border-radius:6px}
+
+/* ---------- Nav ---------- */
+nav{display:flex;gap:10px;padding:18px 28px 0;flex-wrap:wrap}
+nav button{border:1.5px solid var(--pink-300);background:#fff;color:var(--pink-700);font:600 13.5px "Montserrat",sans-serif;padding:11px 20px;border-radius:999px;cursor:pointer;transition:all .18s ease;letter-spacing:.2px}1
+nav button:hover{background:var(--pink-100);transform:translateY(-1px)}
+nav button.active{background:linear-gradient(120deg,var(--pink-600),var(--pink-500));color:#fff;border-color:transparent;box-shadow:0 6px 16px rgba(179,34,95,.28)}
+
+/* ---------- Layout ---------- */
+main{padding:22px 28px 40px;max-width:1340px;margin:0 auto}
+.view{display:none}
+.view.active{display:block;animation:fade .35s ease}
+@keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.view-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:18px;flex-wrap:wrap}
+.view-head h2{font-size:22px;font-weight:800;color:var(--pink-900)}
+.view-head p{font-size:13px;color:var(--muted);margin-top:3px}
+.window-toggle{display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid var(--line);border-radius:999px;padding:6px 12px;font-size:12.5px;color:var(--muted)}
+.window-toggle select{border:0;outline:0;background:transparent;font:700 13px "Montserrat",sans-serif;color:var(--pink-700);cursor:pointer}
+
+/* ---------- KPI cards ---------- */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:22px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px 18px 16px;box-shadow:var(--shadow);position:relative;overflow:hidden;transition:transform .18s ease}
+.kpi:hover{transform:translateY(-3px)}
+.kpi::before{content:"";position:absolute;inset:0 0 auto 0;height:5px;background:linear-gradient(90deg,var(--pink-500),var(--pink-300))}
+.kpi .label{font-size:11.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+.kpi .value{font-size:34px;font-weight:800;color:var(--pink-700);margin:8px 0 4px;line-height:1}
+.kpi .value.pct{font-size:30px}
+.kpi .value.small{font-size:20px;line-height:1.25;word-break:break-word}
+.kpi .hint{font-size:11px;color:var(--muted);line-height:1.45}
+.kpi.wide{grid-column:span 1}
+.tests-header{margin:18px 0 10px;font-size:18px;font-weight:800;color:var(--pink-900)}
+.test-kpis{margin-top:8px;margin-bottom:22px}
+.test-kpis .kpi{padding-bottom:14px}
+.test-kpis .kpi .value{font-size:28px}
+.test-kpis .kpi .label{letter-spacing:.5px}
+
+/* ---------- Panels & charts ---------- */
+.panels{display:grid;grid-template-columns:1.7fr 1fr;gap:16px}
+@media(max-width:900px){.panels{grid-template-columns:1fr}}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow)}
+.panel h3{font-size:15px;font-weight:800;color:var(--pink-900);margin-bottom:14px}
+.panel .sub{font-size:11.5px;color:var(--muted);font-weight:500;margin-left:6px}
+svg.chart{width:100%;height:auto;display:block}
+.bar{fill:var(--pink-500)}
+.bar:hover{fill:var(--pink-700)}
+.axis{fill:var(--muted);font-size:10px;font-family:inherit}
+.stat-row{display:flex;justify-content:space-between;align-items:center;padding:9px 4px;border-bottom:1px dashed var(--line);font-size:13px}
+.stat-row:last-child{border-bottom:0}
+.stat-row .st{font-weight:600;color:var(--ink)}
+.stat-row .n{font-weight:800;color:var(--pink-600)}
+.mini-bar{height:6px;border-radius:99px;background:var(--pink-100);width:120px;overflow:hidden}
+.mini-bar i{display:block;height:100%;background:linear-gradient(90deg,var(--pink-500),var(--pink-300))}
+
+/* ---------- Ledger ---------- */
+.ledger-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:14px;flex-wrap:wrap}
+.ledger-head h3{margin-bottom:0}
+#ledgerSearch{border:1.5px solid var(--line);border-radius:999px;padding:9px 18px;font:500 13px "Montserrat",sans-serif;color:var(--ink);outline:0;width:300px;max-width:100%;background:var(--pink-50)}
+#ledgerSearch:focus{border-color:var(--pink-500)}
+.table-wrap{overflow:auto;max-height:480px;border:1px solid var(--line);border-radius:12px}
+table{width:100%;border-collapse:collapse;font-size:12.5px;min-width:760px}
+thead th{position:sticky;top:0;background:linear-gradient(120deg,var(--pink-700),var(--pink-500));color:#fff;text-align:left;padding:11px 14px;font-size:11px;letter-spacing:.7px;text-transform:uppercase;white-space:nowrap}
+tbody td{padding:9px 14px;border-bottom:1px solid var(--pink-50);color:var(--ink);vertical-align:top}
+tbody tr:nth-child(even){background:var(--pink-50)}
+tbody tr:hover{background:var(--pink-100)}
+.ledger-note{font-size:11.5px;color:var(--muted);margin-top:10px}
+.dl-btn{border:1.5px solid var(--pink-500);background:var(--pink-50);color:var(--pink-700);border-radius:999px;padding:8px 18px;font:700 12.5px "Montserrat",sans-serif;cursor:pointer;white-space:nowrap}
+.dl-btn:hover{background:var(--pink-100)}
+
+/* ---------- KPI icons ---------- */
+.kpi .icon{position:absolute;top:14px;right:14px;width:34px;height:34px;border-radius:10px;background:var(--pink-50);display:flex;align-items:center;justify-content:center}
+.kpi .icon svg{width:18px;height:18px;stroke:var(--pink-600);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- Stat chips ---------- */
+.chips{display:flex;gap:10px;flex-wrap:wrap;margin:-6px 0 22px}
+.chip{background:#fff;border:1px solid var(--line);border-radius:999px;padding:8px 16px;font-size:12.5px;color:var(--muted);box-shadow:var(--shadow)}
+.chip b{color:var(--pink-700);font-weight:800}
+
+/* ---------- Gender illustration & hero ---------- */
+.gender-row{display:flex;align-items:center;gap:14px;padding:14px 0}
+.g-icon{width:46px;height:46px;flex-shrink:0;color:var(--pink-600)}
+.g-icon svg{width:100%;height:100%;fill:currentColor}
+.g-body{flex:1;min-width:0}
+.g-label{font-size:13px;font-weight:700;color:var(--pink-900);text-transform:capitalize}
+.g-count{font-size:26px;font-weight:800;color:var(--pink-700);line-height:1.15}
+.g-bar{height:8px;background:#E9E9E9;border-radius:99px;overflow:hidden;margin-top:6px}
+.g-bar i{display:block;height:100%;background:var(--pink-600);border-radius:99px}
+.g-pct{font-size:17px;font-weight:800;color:var(--pink-700);min-width:46px;text-align:right}
+.hero{display:flex;align-items:center;gap:36px;flex-wrap:wrap;margin-bottom:22px}
+.hero-text{flex:1;min-width:240px}
+.hero-text h3{margin-bottom:4px}
+.hero-text p{font-size:13px;color:var(--muted);margin-bottom:10px}
+.hero-big{font-size:52px;font-weight:800;color:var(--pink-600);line-height:1}
+.hero-sub{font-size:13px;color:var(--muted);margin-top:6px;font-weight:600}
+#heroDonut svg{width:170px}
+
+/* ---------- Donut charts & triple panels ---------- */
+.panels-triple{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+@media(max-width:1000px){.panels-triple{grid-template-columns:1fr}}
+.donut-wrap{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.donut-wrap svg{width:180px;flex-shrink:0}
+.legend{display:flex;flex-direction:column;gap:8px;font-size:12.5px;color:var(--ink)}
+.legend .lg{display:flex;align-items:center;gap:8px}
+.legend .dotc{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.legend b{color:var(--pink-700)}
+.legend .pct{color:var(--muted);font-weight:600}
+
+/* ---------- Placeholder views ---------- */
+.placeholder{background:var(--card);border:1.5px dashed var(--pink-300);border-radius:var(--radius);padding:64px 30px;text-align:center;color:var(--muted)}
+.placeholder .dot{width:52px;height:52px;border-radius:50%;background:linear-gradient(120deg,var(--pink-500),var(--pink-300));margin:0 auto 18px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px;font-weight:800}
+.placeholder h3{color:var(--pink-700);font-size:18px;margin-bottom:8px}
+.placeholder p{font-size:13.5px;max-width:520px;margin:0 auto;line-height:1.6}
+
+.status{font-size:12px;color:var(--muted);padding:0 28px 6px}
+.status b{color:var(--pink-600)}
+.global-range{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.global-range label{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:5px 12px;color:#fff}
+.global-range input{border:0;background:transparent;color:#fff;font:700 12px "Montserrat",sans-serif;outline:0;cursor:pointer}
+.global-range input::-webkit-calendar-picker-indicator{filter:invert(1);cursor:pointer}
+footer{text-align:center;font-size:11px;color:var(--muted);padding:18px 0 26px}
+
+/* ---------- Enrollment filters ---------- */
+.filter-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.filter-bar label{display:flex;align-items:center;gap:8px;background:#fff;border:1.5px solid var(--line);border-radius:999px;padding:6px 14px;font-size:12.5px;color:var(--muted);font-weight:600}
+.filter-bar input[type=date],.filter-bar select{border:0;outline:0;background:transparent;font:700 12.5px "Montserrat",sans-serif;color:var(--pink-700);cursor:pointer}
+
+/* ---------- Recent activity feed ---------- */
+.feed-item{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px dashed var(--line)}
+.feed-item:last-child{border-bottom:0}
+.feed-badge{flex-shrink:0;font-size:10px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#fff;background:linear-gradient(120deg,var(--pink-600),var(--pink-500));border-radius:8px;padding:4px 8px;margin-top:1px;white-space:nowrap}
+.feed-badge.med{background:linear-gradient(120deg,#8E1E4F,#B0225F)}
+.feed-body{flex:1;min-width:0;font-size:12.5px}
+.feed-summary{color:var(--ink);font-weight:600}
+.feed-meta{color:var(--muted);font-size:11px;margin-top:2px}
+
+/* ---------- Age demography (horizontal bars) ---------- */
+.age-card{background:var(--pink-100);border:1px solid var(--pink-300);border-radius:14px;padding:16px 18px}
+.age-row{display:flex;align-items:center;gap:12px;padding:7px 0}
+.age-label{width:72px;flex-shrink:0;font-size:12px;font-weight:600;color:var(--pink-900)}
+.age-track{flex:1;height:14px;background:rgba(255,255,255,.6);border-radius:99px;overflow:hidden}
+.age-track i{display:block;height:100%;background:linear-gradient(90deg,var(--pink-700),var(--pink-500));border-radius:99px}
+.age-n{width:42px;flex-shrink:0;text-align:right;font-size:13px;font-weight:800;color:var(--pink-700)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <img src="assets/kampe_logo_white.png" alt="Kampe">
+    <div>
+      <h1>Kampe Scale Dashboard</h1>
+      <small>Live from Kampe Postgres DB</small>
+    </div>
+  </div>
+  <div class="partners">
+    <img src="assets/drugstoc_logo.png" alt="DrugStoc" class="no-invert">
+    <img src="assets/axa_logo.png" alt="AXA">
+    <img src="assets/pharmaccess_logo.png" alt="PharmAccess">
+  </div>
+  <div class="global-range" title="Applies to every page">
+    <label>From <input type="date" id="globalFrom"></label>
+    <label>To <input type="date" id="globalTo"></label>
+  </div>
+</header>
+
+<nav id="nav">
+  <button data-view="pharmacy" class="active">Pharmacy Profiles</button>
+  <button data-view="enrollees">Enrollment</button>
+  <button data-view="pocts">Claims and POCTs</button>
+  <button data-view="revenue">Revenue</button>
+  <button data-view="enrollments">Pharmacy Activities</button>
+  <button data-view="renewals">Renewals</button>
+  <button data-view="quality">Quality Score</button>
+  <button data-view="malaria">Positive Malaria Cases</button>
+</nav>
+
+<div class="status" id="status">Connecting to Kampe database…</div>
+
+<main>
+  <!-- ============ PHARMACY PROFILES (landing) ============ -->
+  <section class="view active" id="view-pharmacy">
+    <div class="view-head">
+      <div>
+        <h2>Pharmacy Profiles</h2>
+        <p>Onboarding, training and engagement across the Kampe pharmacy network</p>
+      </div>
+      <label class="window-toggle">Active window
+        <select id="windowSelect">
+          <option value="30" selected>Last 30 days</option>
+          <option value="60">Last 60 days</option>
+          <option value="90">Last 90 days</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="kpis" id="kpiGrid">
+      <article class="kpi" data-icon="store"><div class="label">Onboarded Pharmacies</div><div class="value" id="kOnboarded">--</div><div class="hint">From Pharmacies Lolades List.xlsx · Onboarding Attendees tab</div></article>
+      <article class="kpi" data-icon="award"><div class="label">Trained Pharmacies</div><div class="value" id="kTrained">--</div><div class="hint">From Pharmacies Lolades List.xlsx · Trained Pharmacies tab</div></article>
+      <article class="kpi" data-icon="link"><div class="label">Pharmacies with Enrollees</div><div class="value" id="kWithEnrollees">--</div><div class="hint">Pharmacies set as primary pharmacy for ≥1 beneficiary</div></article>
+      <article class="kpi" data-icon="activity"><div class="label">Active Pharmacies</div><div class="value" id="kActive">--</div><div class="hint">≥1 new enrollee in the selected window (default last 30 days)</div></article>
+      <article class="kpi" data-icon="pause"><div class="label">Inactive Pharmacies</div><div class="value" id="kInactive">--</div><div class="hint">Trained − Active</div></article>
+      <article class="kpi" data-icon="percent"><div class="label">% Active</div><div class="value pct" id="kPct">--</div><div class="hint">Active ÷ Onboarded × 100</div></article>
+    </div>
+
+    <div class="panels">
+      <div class="panel">
+        <h3>Monthly Pharmacy Onboarding<span class="sub">last 12 months</span></h3>
+        <div id="trendChart"></div>
+      </div>
+      <div class="panel">
+        <h3>Distribution by City<span class="sub">top 10 by onboarded pharmacies</span></h3>
+        <div id="cityList"></div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <div class="ledger-head">
+        <h3>Pharmacy Ledger</h3>
+        <input type="search" id="ledgerSearch" placeholder="Search pharmacy, address or city…" aria-label="Search ledger">
+      </div>
+      <div class="table-wrap">
+        <table id="ledgerTable">
+          <thead><tr><th>Pharmacy Name</th><th>Address</th><th>City</th><th>Created Date</th><th>Month</th><th>Year</th></tr></thead>
+          <tbody id="ledgerBody"></tbody>
+        </table>
+      </div>
+      <div class="ledger-note" id="ledgerNote"></div>
+    </div>
+  </section>
+
+  <!-- ============ ENROLLMENT ============ -->
+  <section class="view" id="view-enrollees">
+    <div class="view-head">
+      <div>
+        <h2>Enrollment</h2>
+        <p>Beneficiary enrolment, plan status and demographics · excludes inactive policies, yopmail emails and Glad Pharmacy enrollees</p>
+      </div>
+      <div class="filter-bar">
+        <label>From <input type="date" id="enrollFrom"></label>
+        <label>To <input type="date" id="enrollTo"></label>
+        <label>Year
+          <select id="enrollYear"><option value="">All years</option></select>
+        </label>
+        <label>Month
+          <select id="enrollMonth">
+            <option value="">All months</option>
+            <option value="1">January</option><option value="2">February</option><option value="3">March</option>
+            <option value="4">April</option><option value="5">May</option><option value="6">June</option>
+            <option value="7">July</option><option value="8">August</option><option value="9">September</option>
+            <option value="10">October</option><option value="11">November</option><option value="12">December</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div class="kpis" id="enrollKpis">
+      <article class="kpi" data-icon="users"><div class="label">Total Enrollees</div><div class="value" id="eTotal">--</div><div class="hint">All enrolled beneficiaries after exclusions</div></article>
+      <article class="kpi" data-icon="check-circle"><div class="label">Active Plans</div><div class="value" id="eActive">--</div><div class="hint">Policies currently active</div></article>
+      <article class="kpi" data-icon="clock"><div class="label">Expired Plans</div><div class="value" id="eExpired">--</div><div class="hint">Policies past their validity</div></article>
+      <article class="kpi" data-icon="zap"><div class="label">New Enrollees</div><div class="value" id="eNew">--</div><div class="hint">Created within the last 48 hours</div></article>
+      <article class="kpi" data-icon="cursor"><div class="label">Self Enrolled</div><div class="value" id="eSelf">--</div><div class="hint">Enrolled online (source = online)</div></article>
+    </div>
+
+    <div class="hero panel">
+      <div class="hero-text">
+        <h3>Active Plans</h3>
+        <p>Share of enrollees holding an active policy vs expired</p>
+        <div class="hero-big" id="heroActivePct">--</div>
+        <div class="hero-sub" id="heroActiveSub"></div>
+      </div>
+      <div id="heroDonut"></div>
+    </div>
+
+    <div class="chips" id="enrollChips"></div>
+
+    <div class="panel" style="margin-bottom:16px">
+      <div class="ledger-head">
+        <h3>Enrollment Trend<span class="sub" style="font-weight:500">enrollees by created date</span></h3>
+        <label class="window-toggle">Group by
+          <select id="trendGroup">
+            <option value="month" selected>Month</option>
+            <option value="week">Week of the year</option>
+            <option value="year">Year</option>
+          </select>
+        </label>
+      </div>
+      <div id="enrollTrend"></div>
+    </div>
+
+    <div class="panels-triple">
+      <div class="panel">
+        <h3>Gender Distribution</h3>
+        <div id="genderChart"></div>
+      </div>
+      <div class="panel">
+        <h3>Age Demography<span class="sub">from date of birth</span></h3>
+        <div class="age-card" id="ageChart"></div>
+      </div>
+      <div class="panel">
+        <h3>Plans<span class="sub">enrollees per plan</span></h3>
+        <div id="planNameChart"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="view" id="view-pocts">
+    <div class="view-head">
+      <div>
+        <h2>Claims and POCTs</h2>
+        <p>Enrollee claims drawn live from company_beneficiaryactivity (excludes Glad Pharmacy and 2025 enrollees) · POCT activity from company_visittest and company_clinicalvisit</p>
+      </div>
+    </div>
+
+    <div class="kpis" id="actKpis">
+      <article class="kpi" data-icon="file-text"><div class="label">Total Claims</div><div class="value" id="aClaims">--</div><div class="hint" id="aClaimsHint">All activity records after exclusions</div></article>
+      <article class="kpi" data-icon="users"><div class="label">Enrollees Utilizing</div><div class="value" id="aEnrollees">--</div><div class="hint">Distinct beneficiaries with ≥1 claim</div></article>
+      <article class="kpi" data-icon="activity"><div class="label">Most Active Pharmacy</div><div class="value small" id="aTopPharmacy">--</div><div class="hint" id="aTopPharmacyHint"></div></article>
+      <article class="kpi" data-icon="pill"><div class="label">Medication Purchases</div><div class="value" id="aMedPurchases">--</div><div class="hint" id="aMedHint">Share of all claims</div></article>
+    </div>
+
+    <div class="chips" id="actChips"></div>
+
+    <h3 class="tests-header">Tests Performed</h3>
+    <div class="kpis test-kpis" id="testsPerformedGrid">
+      <article class="kpi" data-icon="flask"><div class="label">Malaria Tests</div><div class="value" id="testMalaria">--</div><div class="hint">count when activity text contains “Malaria”</div></article>
+      <article class="kpi" data-icon="drop"><div class="label">FBS Tests</div><div class="value" id="testFbs">--</div><div class="hint">count when activity text contains “Fasting Blood Sugar”</div></article>
+      <article class="kpi" data-icon="lungs"><div class="label">Lung Function Test</div><div class="value" id="testLung">--</div><div class="hint">count when activity text contains “Lung Function”</div></article>
+      <article class="kpi" data-icon="pregnancy"><div class="label">PT</div><div class="value" id="testPt">--</div><div class="hint">count when activity text contains “Pregnancy”</div></article>
+      <article class="kpi" data-icon="pulse"><div class="label">BP Test</div><div class="value" id="testBp">--</div><div class="hint">count when activity text contains “Blood Pressure”</div></article>
+      <article class="kpi" data-icon="urine"><div class="label">Urinalysis</div><div class="value" id="testUrinalysis">--</div><div class="hint">count when activity details contain “Protein”</div></article>
+      <article class="kpi" data-icon="shield"><div class="label">Hepatitis</div><div class="value" id="testHepatitis">--</div><div class="hint">count when activity text contains “Hepatitis”</div></article>
+    </div>
+
+    <div class="panel">
+      <div class="ledger-head">
+        <h3>Tests Performed<span class="sub" style="font-weight:500">test types on rows · counts honour the global date range</span></h3>
+        <button id="tpDownload" class="dl-btn" type="button">Download CSV</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Test</th><th>Count</th><th>Share of Tests</th></tr>
+          </thead>
+          <tbody id="tpRows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panels">
+      <div class="panel">
+        <h3>Monthly Claims Volume<span class="sub">all activity types</span></h3>
+        <div id="actTrend"></div>
+      </div>
+      <div class="panel">
+        <h3>Claims by Type<span class="sub">counts and share of total</span></h3>
+        <div id="actType"></div>
+      </div>
+    </div>
+
+    <div class="kpis" id="poctKpis">
+      <article class="kpi" data-icon="flask"><div class="label">POCTs Performed</div><div class="value" id="pTests">--</div><div class="hint">All test records across clinical visits</div></article>
+      <article class="kpi" data-icon="clipboard"><div class="label">Clinical Visits</div><div class="value" id="pVisits">--</div><div class="hint">Visits where tests or vitals were captured</div></article>
+      <article class="kpi" data-icon="store"><div class="label">Pharmacies Testing</div><div class="value" id="pPharmacies">--</div><div class="hint">Pharmacies with ≥1 clinical visit</div></article>
+      <article class="kpi" data-icon="layers"><div class="label">Avg Tests per Visit</div><div class="value" id="pPerVisit">--</div><div class="hint">Total tests ÷ clinical visits</div></article>
+      <article class="kpi" data-icon="alert"><div class="label">Malaria Positivity</div><div class="value pct" id="pPositivity">--</div><div class="hint">Share of malaria RDTs returning positive</div></article>
+    </div>
+
+    <div class="panels">
+      <div class="panel">
+        <h3>Monthly POCT Volume<span class="sub">tests performed per month</span></h3>
+        <div id="poctTrend"></div>
+      </div>
+      <div class="panel">
+        <h3>Screening Outcomes<span class="sub">positivity of key screening tests</span></h3>
+        <div id="screening"></div>
+      </div>
+    </div>
+
+    <div class="panels-triple">
+      <div class="panel">
+        <h3>Top 10 Tests<span class="sub">by volume performed</span></h3>
+        <div id="topTests"></div>
+      </div>
+      <div class="panel">
+        <h3>Vitals Captured<span class="sub">during clinical visits</span></h3>
+        <div id="vitals"></div>
+      </div>
+    </div>
+
+    <div class="panels">
+      <div class="panel">
+        <h3>Top 10 Active Pharmacies<span class="sub">by claim volume</span></h3>
+        <div id="actPharmacies"></div>
+      </div>
+      <div class="panel">
+        <h3>Recent Activity<span class="sub">latest claims</span></h3>
+        <div id="actRecent"></div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:16px">
+      <div class="ledger-head">
+        <h3>High BP (&gt;140 systolic)<span class="sub" style="font-weight:500">one row per visit with systolic &gt; 140 mmHg · Prescribed Drug = antihypertensive purchase within 7 days of the visit</span></h3>
+        <input type="search" id="highBpSearch" placeholder="Search beneficiary or pharmacy…" aria-label="Search high BP cases">
+        <button id="highBpDownload" class="dl-btn" type="button">Download CSV</button>
+      </div>
+      <div class="table-wrap">
+        <table id="highBpTable">
+          <thead><tr><th>Date</th><th>Beneficiary Name</th><th>Pharmacy</th><th>Systolic BP</th><th>Diastolic BP</th><th>Prescribed Drug</th></tr></thead>
+          <tbody id="highBpBody"></tbody>
+        </table>
+      </div>
+      <div class="ledger-note" id="highBpNote"></div>
+    </div>
+  </section>
+
+  <section class="view" id="view-revenue">
+    <div class="view-head"><div><h2>Revenue</h2><p>Pillometer Lite revenue from trained pharmacies · Kampe meds revenue from Odoo orderlines fuzzy-matched (≥85%) to the Kampe drug list</p></div></div>
+    <div class="kpis" id="revenueKpis">
+      <article class="kpi" data-icon="activity"><div class="label">Pillometer Lite Revenue</div><div class="value" id="rPillometer">--</div><div class="hint" id="rPillometerHint"></div></article>
+      <article class="kpi" data-icon="pill"><div class="label">Kampe Meds Revenue</div><div class="value" id="rKampeMeds">--</div><div class="hint" id="rKampeMedsHint"></div></article>
+      <article class="kpi" data-icon="credit-card"><div class="label">Cards Revenue</div><div class="value" id="rCards">--</div><div class="hint" id="rCardsHint"></div></article>
+    </div>
+    <div class="panel" style="margin-bottom:16px">
+      <div class="ledger-head">
+        <h3>Matched Invoice Lines<span class="sub" style="font-weight:500">drug-list products on invoiced Odoo orderlines at trained pharmacies</span></h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <label class="window-toggle">Client
+            <select id="revClient"><option value="">All clients</option></select>
+          </label>
+          <label class="window-toggle">Year
+            <select id="revYear"><option value="">All years</option></select>
+          </label>
+          <label class="window-toggle">Month
+            <select id="revMonth"><option value="">All months</option>
+              <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option>
+              <option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option>
+              <option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option>
+              <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+            </select>
+          </label>
+          <label class="window-toggle">Week
+            <select id="revWeek"><option value="">All weeks</option></select>
+          </label>
+          <button id="revDownload" class="dl-btn" type="button">Download CSV</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Product match</th><th>Purchase date</th><th>Client</th><th>Qty invoiced</th><th>Total</th></tr>
+          </thead>
+          <tbody id="revRows"></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="4" style="text-align:right;font-weight:800;color:var(--pink-700);padding:11px 14px">Total invoiced</td>
+              <td id="revTotal" style="font-weight:800;color:var(--pink-700);padding:11px 14px;white-space:nowrap"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <div class="ledger-note" id="revNote"></div>
+    </div>
+    <div class="chips" id="revenueChips"></div>
+  </section>
+
+  <section class="view" id="view-enrollments">
+    <div class="view-head"><div><h2>Pharmacy Activities</h2><p>Eligible beneficiaries mapped to their pharmacy locations · tests performed per pharmacy from beneficiary activity · plan breakdown filterable by registration date</p></div></div>
+    <div class="kpis" id="pharmacyEnrollmentKpis">
+      <article class="kpi" data-icon="link"><div class="label">Pharmacies with Enrollees</div><div class="value" id="peCoveredPharmacies">--</div><div class="hint">At least one eligible enrollee</div></article>
+      <article class="kpi" data-icon="users"><div class="label">Enrollees with Pharmacy</div><div class="value" id="peAssigned">--</div><div class="hint">Eligible beneficiary with a primary pharmacy</div></article>
+      <article class="kpi" data-icon="user"><div class="label">Self Enrolled</div><div class="value" id="peSelf">--</div><div class="hint">No primary pharmacy recorded</div></article>
+      <article class="kpi" data-icon="percent"><div class="label">Pharmacy Coverage</div><div class="value pct" id="peCoverage">--</div><div class="hint">Assigned ÷ eligible enrollees</div></article>
+      <article class="kpi" data-icon="activity"><div class="label">Most Active Location</div><div class="value small" id="peMostActive">--</div><div class="hint" id="peMostActiveHint"></div></article>
+      <article class="kpi" data-icon="sparkles"><div class="label">Newest Pharmacy</div><div class="value small" id="peNewest">--</div><div class="hint" id="peNewestHint"></div></article>
+      <article class="kpi" data-icon="store"><div class="label">Most Locations</div><div class="value small" id="peMostLoc">--</div><div class="hint" id="peMostLocHint"></div></article>
+    </div>
+    <div class="chips" id="peChips"></div>
+    <div class="panel" style="margin-bottom:16px">
+      <div class="ledger-head">
+        <h3>Enrollees by Plan<span class="sub" style="font-weight:500">active and expired per plan</span></h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <label class="window-toggle">Year
+            <select id="peYear"><option value="">All years</option></select>
+          </label>
+          <label class="window-toggle">Month
+            <select id="peMonth"><option value="">All months</option>
+              <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option>
+              <option value="4">Apr</option><option value="5">May</option><option value="6">Jun</option>
+              <option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option>
+              <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+            </select>
+          </label>
+          <label class="window-toggle">Week
+            <select id="peWeek"><option value="">All weeks</option></select>
+          </label>
+        </div>
+      </div>
+      <div class="panels" style="margin-bottom:0">
+        <div class="panel" style="box-shadow:none;border:none">
+          <h3>Plan Summary</h3>
+          <div id="pePlanSummary"></div>
+        </div>
+        <div class="panel" style="box-shadow:none;border:none">
+          <h3>Enrollee Coverage</h3>
+          <div id="pharmacyCoverage"></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="ledger-head">
+        <h3>All Pharmacies and Enrollees by Plan<span class="sub" style="font-weight:500">enrollee counts per pharmacy and plan</span></h3>
+        <button id="peDownload" class="dl-btn" type="button">Download CSV</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead id="peHead"></thead>
+          <tbody id="peRows"></tbody>
+        </table>
+      </div>
+      <div class="ledger-note" id="peNote"></div>
+    </div>
+    <div class="panel">
+      <div class="ledger-head">
+        <h3>Tests Performed by Pharmacy<span class="sub" style="font-weight:500">keyword matches in beneficiary activity details · honours the global date range</span></h3>
+        <button id="ptDownload" class="dl-btn" type="button">Download CSV</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Pharmacy</th><th>Malaria</th><th>FBS</th><th>Lung Function</th><th>PT</th><th>BP</th><th>Urinalysis</th><th>Hepatitis</th><th>Total</th></tr>
+          </thead>
+          <tbody id="ptRows"></tbody>
+        </table>
+      </div>
+      <div class="ledger-note" id="ptNote"></div>
+    </div>
+  </section>
+
+  <section class="view" id="view-renewals">
+    <div class="view-head"><div><h2>Renewals</h2><p>A beneficiary paying more than once is a renewal · paid payments from payment_payment mapped to eligible beneficiaries</p></div></div>
+    <div class="kpis" id="renewalKpis">
+      <article class="kpi" data-icon="credit-card"><div class="label">Paid Payments</div><div class="value" id="rnPayments">--</div><div class="hint">Settled transactions (success or paid)</div></article>
+      <article class="kpi" data-icon="users"><div class="label">Unique Payers</div><div class="value" id="rnPayers">--</div><div class="hint">Beneficiaries with ≥1 paid payment</div></article>
+      <article class="kpi" data-icon="zap"><div class="label">Renewals</div><div class="value" id="rnRenewals">--</div><div class="hint">Payments after a beneficiary's first</div></article>
+      <article class="kpi" data-icon="percent"><div class="label">Renewal Rate</div><div class="value pct" id="rnRate">--</div><div class="hint">Payers who renewed at least once</div></article>
+      <article class="kpi" data-icon="activity"><div class="label">Renewal Revenue</div><div class="value" id="rnAmount">--</div><div class="hint">Amount on renewal payments (÷ 100)</div></article>
+      <article class="kpi" data-icon="layers"><div class="label">Avg Payments per Payer</div><div class="value" id="rnAvg">--</div><div class="hint">Renewals + first payments ÷ payers</div></article>
+    </div>
+    <div class="chips" id="renewalChips"></div>
+    <div class="panels">
+      <div class="panel">
+        <h3>Monthly First Payments vs Renewals<span class="sub">renewal momentum over time</span></h3>
+        <div id="renewalTrend"></div>
+      </div>
+      <div class="panel">
+        <h3>Renewal Rate by Plan<span class="sub">share of payers who renewed</span></h3>
+        <div id="renewalPlans"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="ledger-head">
+        <h3>Top Renewing Enrollees<span class="sub">most repeat payments</span></h3>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Enrollee</th><th>Payments</th><th>Total paid (÷ 100)</th><th>Last payment</th></tr>
+          </thead>
+          <tbody id="rnRows"></tbody>
+        </table>
+      </div>
+      <div class="ledger-note" id="rnNote"></div>
+    </div>
+  </section>
+
+  <section class="view" id="view-quality">
+    <div class="view-head"><div><h2>Quality Score</h2><p>Per-pharmacy measures · ≥80% earns ₦30,000 · Hypertensive Rx earns ₦20,000 from 50–79.99%; other measures use 60–79.99% · below each band earns nothing</p></div></div>
+    <div class="kpis" id="qualityKpis">
+      <article class="kpi" data-icon="award"><div class="label">Total Quality Payout</div><div class="value" id="qTotalPayout">--</div><div class="hint">All four measures combined</div></article>
+      <article class="kpi" data-icon="star"><div class="label">5-Star Pharmacies (BP Tests)</div><div class="value" id="qFiveStar">--</div><div class="hint">BP tests ≥80% of adult enrollees</div></article>
+      <article class="kpi" data-icon="activity"><div class="label">Pharmacies Scored</div><div class="value" id="qScored">--</div><div class="hint">With any quality activity in range</div></article>
+      <article class="kpi" data-icon="percent"><div class="label">BP Measurement Average</div><div class="value pct" id="q1Average">--</div><div class="hint">Mean BP measurement score</div></article>
+      <article class="kpi" data-icon="percent"><div class="label">Hypertensive Rx Average</div><div class="value pct" id="q2Average">--</div><div class="hint">Mean hypertensive Rx score</div></article>
+      <article class="kpi" data-icon="percent"><div class="label">BP Test Coverage Average</div><div class="value pct" id="q3Average">--</div><div class="hint">Mean BP test coverage score</div></article>
+      <article class="kpi" data-icon="percent"><div class="label">Malaria Treatment Average</div><div class="value pct" id="q4Average">--</div><div class="hint">Mean malaria treatment score</div></article>
+      <article class="kpi" data-icon="percent"><div class="label">Overall Average</div><div class="value pct" id="qAverageScore">--</div><div class="hint">Mean of Q1, Q2, Q3 and Q4 averages</div></article>
+    </div>
+    <div class="chips" id="qualityChips"></div>
+    <div class="panel" style="margin-bottom:16px">
+      <div class="ledger-head">
+        <h3>1 · BP Measurement<span class="sub" style="font-weight:500">adult enrollees with ≥1 BP test ÷ total adult enrollees · per pharmacy location</span></h3>
+        <button id="q1Download" class="dl-btn" type="button">Download CSV</button>
+      </div>
+      <div class="table-wrap">
+        <table id="q1Table">
+          <thead><tr><th>Pharmacy · Location</th><th>Address</th><th>Adult enrollees</th><th>With BP test</th><th>Total visits</th><th>Score</th><th>Stars</th><th>Payout</th></tr></thead>
+          <tbody id="q1Rows"></tbody>
+        </table>
+      </div>
+      <div class="ledger-note" id="q1Note"></div>
+    </div>
+    <div class="panels" style="margin-bottom:16px">
+      <div class="panel">
+        <div class="ledger-head"><h3>2 · Hypertensive Rx<span class="sub" style="font-weight:500">HTN medications dispensed ÷ visits with systolic BP &gt;120 · 50–79.99% = ₦20,000 · ≥80% = ₦30,000</span></h3><button id="q2Download" class="dl-btn" type="button">Download CSV</button></div>
+        <div class="table-wrap"><table id="q2Table">
+          <thead><tr><th>Pharmacy</th><th>HTN Rx Dispensed</th><th>High BP Visits (&gt;120 systolic)</th><th>Score</th><th>Stars</th><th>Payout</th></tr></thead>
+          <tbody id="q2Rows"></tbody>
+        </table></div>
+        <div class="ledger-note" id="q2Note"></div>
+      </div>
+      <div class="panel">
+        <div class="ledger-head"><h3>3 · BP Test Coverage<span class="sub" style="font-weight:500">BP tests ÷ total clinical visits · pharmacies with no visits excluded</span></h3><button id="q3Download" class="dl-btn" type="button">Download CSV</button></div>
+        <div class="table-wrap"><table id="q3Table">
+          <thead><tr><th>Pharmacy</th><th>BP tests</th><th>Total visits</th><th>Score</th><th>Stars</th><th>Payout</th></tr></thead>
+          <tbody id="q3Rows"></tbody>
+        </table></div>
+        <div class="ledger-note" id="q3Note"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="ledger-head"><h3>4 · mRDT + Malaria Rx<span class="sub" style="font-weight:500">antimalarial prescriptions ÷ positive malaria tests</span></h3><button id="q4Download" class="dl-btn" type="button">Download CSV</button></div>
+      <div class="table-wrap"><table id="q4Table">
+        <thead><tr><th>Pharmacy</th><th>Malaria Rx</th><th>Positive malaria tests</th><th>Score</th><th>Stars</th><th>Payout</th></tr></thead>
+        <tbody id="q4Rows"></tbody>
+      </table></div>
+      <div class="ledger-note" id="q4Note"></div>
+    </div>
+  </section>
+
+  <!-- ============ MALARIA POSITIVE CASES ============ -->
+  <section class="view" id="view-malaria">
+    <div class="view-head">
+      <div>
+        <h2>Malaria Positive Cases</h2>
+        <p>One row per positive malaria test · Prescribed Drug shows the antimalarial purchase recorded for the same beneficiary within 7 days of the test (blank if none found) · honours the global date range and pharmacy exclusions</p>
+      </div>
+    </div>
+    <div class="kpis" style="margin-bottom:16px">
+      <article class="kpi" data-icon="flask"><div class="label">Positive Malaria Tests</div><div class="value" id="mPosTotal">--</div><div class="hint">Every positive test counts, including repeat tests for the same beneficiary</div></article>
+    </div>
+    <div class="panel">
+      <div class="ledger-head">
+        <h3>Malaria Positive Cases</h3>
+        <input type="search" id="malariaSearch" placeholder="Search beneficiary or pharmacy…" aria-label="Search malaria cases">
+        <button id="malariaDownload" class="dl-btn" type="button">Download CSV</button>
+      </div>
+      <div class="table-wrap">
+        <table id="malariaTable">
+          <thead><tr><th>Date</th><th>Beneficiary Name</th><th>Pharmacy</th><th>Prescribed Drug</th></tr></thead>
+          <tbody id="malariaBody"></tbody>
+        </table>
+      </div>
+      <div class="ledger-note" id="malariaNote"></div>
+    </div>
+  </section>
+</main>
+
+<footer>Kampe Scale Dashboard · Data refreshes on every load · Onboarded &amp; Trained counts sourced from Pharmacies Lolades List.xlsx · All other figures exclude test accounts, yopmail signups and Glad Pharmacy</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+
+/* ---------- Nav switching ---------- */
+document.querySelectorAll('#nav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('active', b === btn));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    $('view-' + btn.dataset.view).classList.add('active');
+  });
+});
+
+/* ---------- Formatting ---------- */
+const fmt = n => Number(n).toLocaleString();
+
+/* ---------- Global calendar range (header, applies to all pages) ---------- */
+function globalRangeQs() {
+  const qs = new URLSearchParams();
+  if ($('globalFrom').value) qs.set('from', $('globalFrom').value);
+  if ($('globalTo').value) qs.set('to', $('globalTo').value);
+  return qs;
+}
+
+function inGlobalRange(dateStr) {
+  if (!dateStr) return false;
+  const f = $('globalFrom').value, t = $('globalTo').value;
+  return (!f || dateStr >= f) && (!t || dateStr <= t);
+}
+
+function reloadAll() {
+  loadData();
+  loadEnrollment();
+  loadPocts();
+  loadActivities();
+  loadRevenue();
+  loadPharmacyEnrollments();
+  loadRenewals();
+  loadQuality();
+  loadMalaria();
+  loadHighBp();
+}
+
+/* ---------- KPI icons ---------- */
+const ICONS = {
+  store: '<path d="M3 9l1.7-5.5h14.6L21 9"/><path d="M3 9v11a1 1 0 001 1h16a1 1 0 001-1V9"/><path d="M3 9h18"/><path d="M9 21v-6h6v6"/>',
+  award: '<circle cx="12" cy="9" r="6"/><path d="M8.5 14L7 22l5-3 5 3-1.5-8"/>',
+  link: '<path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>',
+  activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+  pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
+  percent: '<line x1="19" y1="5" x2="5" y2="19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
+  users: '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>',
+  'check-circle': '<circle cx="12" cy="12" r="10"/><path d="M8 12.5l2.5 2.5L16 9.5"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  zap: '<path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>',
+  cursor: '<path d="M4 4l7.5 16 2-7 7-2L4 4z"/>',
+  flask: '<path d="M10 2v6L4.5 18a2 2 0 001.8 3h11.4a2 2 0 001.8-3L14 8V2"/><path d="M8.5 2h7"/><path d="M7 15h10"/>',
+  clipboard: '<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2"/><path d="M9 12h6"/><path d="M9 16h6"/>',
+  layers: '<path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>',
+  alert: '<path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  'file-text': '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/>',
+  pill: '<path d="M10.5 20.5a5.3 5.3 0 01-7.5-7.5l8.5-8.5a5.3 5.3 0 017.5 7.5z"/><path d="M8.5 8.5l7 7"/>',
+  drop: '<path d="M12 2.5C8.4 6.6 6 8.9 6 12.2A6 6 0 0018 12.2C18 8.9 15.6 6.6 12 2.5z"/><path d="M12 8v4"/><path d="M9.7 14.2c.8 1.1 1.3 1.9 2.3 1.9s1.5-.8 2.3-1.9"/>',
+  lungs: '<path d="M9 7.5C7.6 7.5 6.5 8.7 6.5 10.2v3.6c0 2 1.6 3.6 3.6 3.6h1.3V8.7L9 7.5zm6 0c1.4 0 2.5 1.2 2.5 2.7v3.6c0 2-1.6 3.6-3.6 3.6h-1.3V8.7l1.4-1.2zm-5.1 2.2h2.2v6.7H9.9v-6.7zm4.2 0h-2.2v6.7h2.2v-6.7z"/><path d="M5.5 12.5c-1.5 0-2.7 1.2-2.7 2.7 0 1.2.8 2.3 2 2.6"/><path d="M18.5 12.5c1.5 0 2.7 1.2 2.7 2.7 0 1.2-.8 2.3-2 2.6"/>',
+  pregnancy: '<path d="M12 20.5c-4.6 0-7.5-3.4-7.5-7.3C4.5 8.8 7.5 6 12 6s7.5 2.8 7.5 7.2c0 3.9-2.9 7.3-7.5 7.3z"/><path d="M12 2.5v4"/><path d="M12 11.5c-1.9 0-3.5 1.6-3.5 3.5S10.1 18.5 12 18.5s3.5-1.6 3.5-3.5-1.6-3.5-3.5-3.5z"/><path d="M8.5 11l7 7"/>',
+  pulse: '<path d="M2 12h4l2.5-6 4 12 2.5-6H22"/><path d="M6 18h12"/>',
+  urine: '<path d="M8 3h8v4c0 3.2-1.5 5.5-4 7.5C9.5 12.5 8 10.2 8 7V3z"/><path d="M10 14.5h4v5.5h-4z"/><path d="M9 18h6"/><path d="M12 10.5v2.2"/>',
+  shield: '<path d="M12 2.5l7 3v6.2A11.1 11.1 0 0112 22a11.1 11.1 0 01-7-10.3V5.5l7-3z"/><path d="M9.5 10h5"/><path d="M12 7.5v5"/>',
+  user: '<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  sparkles: '<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"/><path d="M19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9L19 15z"/>',
+  'credit-card': '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/><path d="M6 15h4"/>',
+  star: '<path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9z"/>'
+};
+document.querySelectorAll('[data-icon]').forEach(card => {
+  const span = document.createElement('span');
+  span.className = 'icon';
+  span.innerHTML = `<svg viewBox="0 0 24 24">${ICONS[card.dataset.icon] || ''}</svg>`;
+  card.appendChild(span);
+});
+
+/* ---------- Bar chart (hand-rolled SVG) ---------- */
+function renderBarChart(el, rows) {
+  if (!rows.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px">No onboarding data in the last 12 months.</p>'; return; }
+  const W = 640, H = 240, padL = 34, padB = 44, padT = 12;
+  const max = Math.max(...rows.map(r => r.n), 1);
+  const bw = (W - padL - 10) / rows.length;
+  let svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img">`;
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + (H - padB - padT) * (1 - i / 4);
+    svg += `<line x1="${padL}" y1="${y}" x2="${W - 6}" y2="${y}" stroke="#F3D3E0" stroke-width="1"/>
+            <text class="axis" x="${padL - 6}" y="${y + 3}" text-anchor="end">${Math.round(max * i / 4)}</text>`;
+  }
+  rows.forEach((r, i) => {
+    const h = (H - padB - padT) * (r.n / max);
+    const x = padL + i * bw + bw * 0.18, w = bw * 0.64;
+    const y = H - padB - h;
+    const d = r.month ? new Date(r.month) : null;
+    const label = r.label || (d ? d.toLocaleString('en', { month: 'short' }) + " '" + String(d.getFullYear()).slice(2) : '');
+    svg += `<rect class="bar" x="${x}" y="${y}" width="${w}" height="${h}" rx="4"><title>${label}: ${r.n} pharmacies</title></rect>
+            <text class="axis" x="${x + w / 2}" y="${H - padB + 16}" text-anchor="middle">${label}</text>
+            <text class="axis" x="${x + w / 2}" y="${y - 5}" text-anchor="middle" font-weight="700" fill="#8E1E4F">${r.n}</text>`;
+  });
+  svg += '</svg>';
+  el.innerHTML = svg;
+}
+
+/* ---------- City distribution ---------- */
+function renderCities(el, rows) {
+  if (!rows.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px">No location data.</p>'; return; }
+  const max = Math.max(...rows.map(r => r.n), 1);
+  el.innerHTML = rows.map(r => `
+    <div class="stat-row">
+      <span class="st">${r.city}</span>
+      <span class="mini-bar"><i style="width:${Math.round(r.n / max * 100)}%"></i></span>
+      <span class="n">${fmt(r.n)}</span>
+    </div>`).join('');
+}
+
+/* ---------- Pharmacy ledger ---------- */
+let ledgerRows = [];
+function renderLedger() {
+  const q = $('ledgerSearch').value.trim().toLowerCase();
+  const rows = q
+    ? ledgerRows.filter(r => [r.name, r.address, r.city].some(v => (v || '').toLowerCase().includes(q)))
+    : ledgerRows;
+  const toShow = rows.slice(0, 300);
+  $('ledgerBody').innerHTML = toShow.map(r => {
+    const d = r.created_at ? new Date(r.created_at) : null;
+    const valid = d && !Number.isNaN(d.getTime());
+    return `<tr>
+      <td>${r.name || '-'}</td>
+      <td>${r.address || '-'}</td>
+      <td>${r.city || '-'}</td>
+      <td>${valid ? d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}</td>
+      <td>${valid ? d.toLocaleString('en', { month: 'long' }) : '-'}</td>
+      <td>${valid ? d.getFullYear() : '-'}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:22px">No pharmacies match your search.</td></tr>`;
+  $('ledgerNote').textContent = `Showing ${fmt(toShow.length)} of ${fmt(rows.length)} matching pharmacies (excl. test accounts, yopmail signups and Glad Pharmacy)`;
+}
+
+/* ---------- Donut chart (hand-rolled SVG) ---------- */
+const DONUT_COLORS = ['#D6336C', '#F2A0C0', '#8E1E4F', '#F7C6DA'];
+function renderDonut(el, rows, centerTop, centerBottom) {
+  if (!rows.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px">No data.</p>'; return; }
+  const total = rows.reduce((s, r) => s + r.n, 0) || 1;
+  const R = 54, C = 2 * Math.PI * R;
+  let offset = 0, segs = '';
+  rows.forEach((r, i) => {
+    const frac = r.n / total;
+    segs += `<circle cx="70" cy="70" r="${R}" fill="none" stroke="${DONUT_COLORS[i % DONUT_COLORS.length]}" stroke-width="26"
+      stroke-dasharray="${(frac * C).toFixed(2)} ${C.toFixed(2)}" stroke-dashoffset="${(-offset * C).toFixed(2)}" transform="rotate(-90 70 70)">
+      <title>${r.label}: ${fmt(r.n)} (${(frac * 100).toFixed(1)}%)</title></circle>`;
+    offset += frac;
+  });
+  el.innerHTML = `<div class="donut-wrap">
+    <svg viewBox="0 0 140 140" class="chart">${segs}
+      <text x="70" y="68" text-anchor="middle" font-size="19" font-weight="800" fill="#8E1E4F">${centerTop}</text>
+      <text x="70" y="85" text-anchor="middle" font-size="8.5" fill="#9C5A76">${centerBottom || ''}</text>
+    </svg>
+    <div class="legend">${rows.map((r, i) => `
+      <div class="lg"><span class="dotc" style="background:${DONUT_COLORS[i % DONUT_COLORS.length]}"></span>
+      ${r.label} <b>${fmt(r.n)}</b> <span class="pct">${(r.n / total * 100).toFixed(1)}%</span></div>`).join('')}
+    </div>
+  </div>`;
+}
+
+/* ---------- Line chart (hand-rolled SVG) ---------- */
+function getIsoWeek(date) {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const day = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
+}
+function renderLineChart(el, rows, group) {
+  if (!rows.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px">No enrollment data for this grouping.</p>'; return; }
+  const W = 660, H = 250, padL = 38, padB = 42, padT = 14, padR = 14;
+  const max = Math.max(...rows.map(r => r.n), 1);
+  const X = i => padL + (W - padL - padR) * (rows.length === 1 ? 0.5 : i / (rows.length - 1));
+  const Y = v => padT + (H - padB - padT) * (1 - v / max);
+  const labelOf = r => {
+    const d = new Date(r.bucket);
+    if (group === 'year') return String(d.getFullYear());
+    if (group === 'week') return 'W' + getIsoWeek(d);
+    return d.toLocaleString('en', { month: 'short' }) + " '" + String(d.getFullYear()).slice(2);
+  };
+  const pts = rows.map((r, i) => `${X(i).toFixed(1)},${Y(r.n).toFixed(1)}`).join(' ');
+  const step = Math.max(1, Math.ceil(rows.length / 12));
+  let svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img">
+    <defs><linearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#D6336C" stop-opacity="0.30"/><stop offset="100%" stop-color="#D6336C" stop-opacity="0.03"/>
+    </linearGradient></defs>`;
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + (H - padB - padT) * (1 - i / 4);
+    svg += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="#F3D3E0" stroke-width="1"/>
+            <text class="axis" x="${padL - 6}" y="${y + 3}" text-anchor="end">${Math.round(max * i / 4)}</text>`;
+  }
+  svg += `<polygon points="${padL},${H - padB} ${pts} ${X(rows.length - 1).toFixed(1)},${H - padB}" fill="url(#areaFill)"/>
+    <polyline points="${pts}" fill="none" stroke="#D6336C" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+  rows.forEach((r, i) => {
+    svg += `<circle cx="${X(i).toFixed(1)}" cy="${Y(r.n).toFixed(1)}" r="3.5" fill="#8E1E4F"><title>${labelOf(r)}: ${fmt(r.n)} enrollees</title></circle>`;
+    if (i % step === 0 || i === rows.length - 1) {
+      svg += `<text class="axis" x="${X(i).toFixed(1)}" y="${H - padB + 16}" text-anchor="middle">${labelOf(r)}</text>`;
+    }
+  });
+  svg += '</svg>';
+  el.innerHTML = svg;
+}
+
+/* ---------- Gender illustration (icon + count + % bar) ---------- */
+const GENDER_ICONS = {
+  male: '<svg viewBox="0 0 24 24"><circle cx="12" cy="7" r="4.2"/><path d="M12 12.5c-4.4 0-7.5 2.6-7.5 6.2V20h15v-1.3c0-3.6-3.1-6.2-7.5-6.2z"/></svg>',
+  female: '<svg viewBox="0 0 24 24"><path d="M12 2.5c-3.8 0-6.4 2.7-6.4 6.6 0 1 .2 2 .6 2.9.6-1.1 1.2-1.9 1.4-3 .9 1 2.4 1.5 4.4 1.5s3.5-.5 4.4-1.5c.2 1.1.8 1.9 1.4 3 .4-.9.6-1.9.6-2.9 0-3.9-2.6-6.6-6.4-6.6z"/><circle cx="12" cy="8" r="3.4"/><path d="M12 12.8c-4.4 0-7.5 2.6-7.5 6.2V20h15v-1c0-3.6-3.1-6.2-7.5-6.2z"/></svg>'
+};
+function renderGender(el, rows) {
+  const total = rows.reduce((s, r) => s + r.n, 0) || 1;
+  el.innerHTML = ['male', 'female'].map(g => {
+    const r = rows.find(x => x.label === g) || { n: 0 };
+    const pct = r.n / total * 100;
+    return `<div class="gender-row">
+      <span class="g-icon">${GENDER_ICONS[g]}</span>
+      <div class="g-body">
+        <div class="g-label">${g}</div>
+        <div class="g-count">${fmt(r.n)}</div>
+        <div class="g-bar"><i style="width:${pct.toFixed(1)}%"></i></div>
+      </div>
+      <span class="g-pct">${pct.toFixed(0)}%</span>
+    </div>`;
+  }).join('');
+}
+
+/* ---------- Age demography (horizontal bars, highest first) ---------- */
+function renderAgeBars(el, rows) {
+  if (!rows.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px">No age data for this filter.</p>'; return; }
+  const sorted = rows.slice().sort((a, b) => b.n - a.n);
+  const max = Math.max(...sorted.map(r => r.n), 1);
+  const total = sorted.reduce((s, r) => s + r.n, 0);
+  el.innerHTML = sorted.map(r => `
+    <div class="age-row">
+      <span class="age-label">${r.label}</span>
+      <span class="age-track"><i style="width:${(r.n / max * 100).toFixed(1)}%" title="${r.label}: ${fmt(r.n)} (${(r.n / total * 100).toFixed(1)}%)"></i></span>
+      <span class="age-n">${fmt(r.n)}</span>
+    </div>`).join('');
+}
+
+/* ---------- Enrollee Activities view ---------- */
+let lastActs = null, lastActsQs = null, lastPharmacyTests = [];
+
+function renderPharmacyTests(rows) {
+  lastPharmacyTests = rows;
+  const cols = ['malaria', 'fbs', 'lung_function', 'pt', 'bp', 'urinalysis', 'hepatitis'];
+  if (!rows.length) {
+    $('ptRows').innerHTML = '<tr><td colspan="9" style="color:var(--muted);padding:16px 14px">No test activity for this date range.</td></tr>';
+    $('ptNote').textContent = 'Counts use keyword matches on activity details (same logic as the Tests Performed grid on the Claims page)';
+    return;
+  }
+  $('ptRows').innerHTML = rows.map(r => `
+    <tr>
+      <td><b>${r.pharmacy}</b></td>
+      ${cols.map(c => `<td>${r[c] ? fmt(r[c]) : '–'}</td>`).join('')}
+      <td style="font-weight:800;color:var(--pink-700)">${fmt(r.total)}</td>
+    </tr>`).join('') + `
+    <tr style="background:var(--pink-100)">
+      <td style="text-align:right;font-weight:800;color:var(--pink-700);padding:11px 14px">Totals (${fmt(rows.length)} pharmacies)</td>
+      ${cols.map(c => `<td style="font-weight:800;color:var(--pink-700)">${fmt(rows.reduce((s, r) => s + (r[c] || 0), 0))}</td>`).join('')}
+      <td style="font-weight:800;color:var(--pink-700)">${fmt(rows.reduce((s, r) => s + r.total, 0))}</td>
+    </tr>`;
+  $('ptNote').textContent = `Showing ${fmt(rows.length)} pharmacies · counts use keyword matches on activity details (same logic as the Tests Performed grid on the Claims page)`;
+}
+
+// Shares the /api/activities payload with the Pharmacy Activities page so the
+// tests-by-pharmacy table is rendered from one request.
+async function ensurePharmacyTests() {
+  const qs = globalRangeQs().toString();
+  if (lastActs && lastActsQs === qs) { renderPharmacyTests(lastActs.pharmacyTests || []); return; }
+  try {
+    const res = await fetch(`/api/activities?${qs}`, { cache: 'no-store' });
+    const p = await res.json();
+    if (p.error) throw new Error(p.error);
+    lastActs = p;
+    lastActsQs = qs;
+    renderPharmacyTests(p.pharmacyTests || []);
+  } catch (err) {
+    $('ptRows').innerHTML = `<tr><td colspan="9" style="color:var(--muted);padding:16px 14px">Tests data unavailable: ${err.message}</td></tr>`;
+  }
+}
+
+function downloadPtCsv() {
+  const cols = ['malaria', 'fbs', 'lung_function', 'pt', 'bp', 'urinalysis', 'hepatitis'];
+  const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const head = ['Pharmacy', 'Malaria', 'FBS', 'Lung Function', 'PT', 'BP', 'Urinalysis', 'Hepatitis', 'Total'];
+  const lines = [head.map(esc).join(',')].concat(
+    lastPharmacyTests.map(r => [r.pharmacy, ...cols.map(c => r[c] || 0), r.total].map(esc).join(',')),
+    [['Totals (' + lastPharmacyTests.length + ' pharmacies)', ...cols.map(c => lastPharmacyTests.reduce((s, r) => s + (r[c] || 0), 0)),
+      lastPharmacyTests.reduce((s, r) => s + r.total, 0)].map(esc).join(',')]
+  );
+  const from = $('globalFrom').value, to = $('globalTo').value;
+  const tag = [from && 'from' + from, to && 'to' + to].filter(Boolean).join('_') || 'all';
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `kampe_tests_per_pharmacy_${tag}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function timeAgo(iso) {
+  const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (s < 3600) return Math.max(1, Math.round(s / 60)) + ' min ago';
+  if (s < 86400) return Math.round(s / 3600) + ' hrs ago';
+  const d = Math.round(s / 86400);
+  return d === 1 ? '1 day ago' : d + ' days ago';
+}
+
+function renderRecent(el, rows) {
+  if (!rows.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px">No recent activity.</p>'; return; }
+  el.innerHTML = rows.map(r => `
+    <div class="feed-item">
+      <span class="feed-badge${r.title === 'Medication Purchase' ? ' med' : ''}">${r.title === 'Medication Purchase' ? 'Meds' : 'Visit'}</span>
+      <div class="feed-body">
+        <div class="feed-summary">${r.summary || r.title}</div>
+        <div class="feed-meta">${r.pharmacy} · ${timeAgo(r.created_at)}</div>
+      </div>
+    </div>`).join('');
+}
+
+let lastTestsPerformed = {};
+function renderTestsPerformedTable(tests) {
+  lastTestsPerformed = tests;
+  const rows = [
+    ['Malaria', tests.malaria],
+    ['FBS', tests.fbs],
+    ['Lung Function', tests.lungFunction],
+    ['PT', tests.pt],
+    ['BP', tests.bp],
+    ['Urinalysis', tests.urinalysis],
+    ['Hepatitis', tests.hepatitis],
+  ];
+  const total = rows.reduce((s, r) => s + (r[1] || 0), 0);
+  $('tpRows').innerHTML = rows.map(([label, n]) => `
+    <tr>
+      <td><b>${label}</b></td>
+      <td>${fmt(n || 0)}</td>
+      <td>${total ? (n / total * 100).toFixed(1) + '%' : '–'}</td>
+    </tr>`).join('') + `
+    <tr style="background:var(--pink-100)">
+      <td style="font-weight:800;color:var(--pink-700)">Total</td>
+      <td style="font-weight:800;color:var(--pink-700)">${fmt(total)}</td>
+      <td style="font-weight:800;color:var(--pink-700)">${total ? '100.0%' : '–'}</td>
+    </tr>`;
+}
+
+function downloadTpCsv() {
+  const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const rows = [
+    ['Malaria', lastTestsPerformed.malaria],
+    ['FBS', lastTestsPerformed.fbs],
+    ['Lung Function', lastTestsPerformed.lungFunction],
+    ['PT', lastTestsPerformed.pt],
+    ['BP', lastTestsPerformed.bp],
+    ['Urinalysis', lastTestsPerformed.urinalysis],
+    ['Hepatitis', lastTestsPerformed.hepatitis],
+  ];
+  const total = rows.reduce((s, r) => s + (r[1] || 0), 0);
+  const lines = [['Test', 'Count', 'Share of Tests'].map(esc).join(',')].concat(
+    rows.map(([label, n]) => [label, n || 0, total ? (n / total * 100).toFixed(1) + '%' : ''].map(esc).join(',')),
+    [['Total', total, total ? '100.0%' : ''].map(esc).join(',')]
+  );
+  const from = $('globalFrom').value, to = $('globalTo').value;
+  const tag = [from && 'from' + from, to && 'to' + to].filter(Boolean).join('_') || 'all';
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `kampe_tests_performed_${tag}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function loadActivities() {
+  try {
+    const qs = globalRangeQs().toString();
+    const res = await fetch(`/api/activities?${qs}`, { cache: 'no-store' });
+    const p = await res.json();
+    if (p.error) throw new Error(p.error);
+    lastActs = p;
+    lastActsQs = qs;
+
+    const total = p.kpis.totalClaims || 1;
+    $('aClaims').textContent = fmt(p.kpis.totalClaims);
+    $('aEnrollees').textContent = fmt(p.kpis.enrollees);
+    $('aTopPharmacy').textContent = p.topPharmacies[0]?.label || '–';
+    $('aTopPharmacyHint').textContent = p.topPharmacies[0]
+      ? `${fmt(p.topPharmacies[0].n)} claims · ${(p.topPharmacies[0].n / total * 100).toFixed(1)}% of all claims` : '';
+    $('aMedPurchases').textContent = fmt(p.kpis.medPurchases);
+    $('aMedHint').textContent = `${(p.kpis.medPurchases / total * 100).toFixed(1)}% of all claims`;
+
+    const tests = p.testsPerformed || {};
+    $('testMalaria').textContent = fmt(tests.malaria || 0);
+    $('testFbs').textContent = fmt(tests.fbs || 0);
+    $('testLung').textContent = fmt(tests.lungFunction || 0);
+    $('testPt').textContent = fmt(tests.pt || 0);
+    $('testBp').textContent = fmt(tests.bp || 0);
+    $('testUrinalysis').textContent = fmt(tests.urinalysis || 0);
+    $('testHepatitis').textContent = fmt(tests.hepatitis || 0);
+    renderTestsPerformedTable(tests);
+
+    $('actChips').innerHTML = [
+      `${fmt(p.kpis.pharmacies)} pharmacies with claims`,
+      `${fmt(p.kpis.last30)} claims in the last 30 days`,
+      `Medication purchases <b>${fmt(p.kpis.medPurchases)}</b> (${(p.kpis.medPurchases / total * 100).toFixed(1)}%)`,
+      `Clinical visits <b>${fmt(total - p.kpis.medPurchases)}</b> (${((total - p.kpis.medPurchases) / total * 100).toFixed(1)}%)`
+    ].map(c => `<span class="chip">${c}</span>`).join('');
+
+    renderLineChart($('actTrend'), p.monthly, 'month');
+    renderDonut($('actType'), p.titleSplit, fmt(p.kpis.totalClaims), 'CLAIMS');
+    renderStatRows($('actPharmacies'), p.topPharmacies);
+    renderRecent($('actRecent'), p.recent);
+  } catch (err) {
+    $('actChips').innerHTML = `<span class="chip">Activity data unavailable: ${err.message}</span>`;
+  }
+}
+
+/* ---------- POCT view ---------- */
+function renderStatRows(el, rows) {
+  if (!rows.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px">No data.</p>'; return; }
+  const max = Math.max(...rows.map(r => r.n), 1);
+  el.innerHTML = rows.map(r => `
+    <div class="stat-row">
+      <span class="st">${r.label}</span>
+      <span class="mini-bar"><i style="width:${Math.round(r.n / max * 100)}%"></i></span>
+      <span class="n">${fmt(r.n)}</span>
+    </div>`).join('');
+}
+
+const fmtAmount = n => Number(n || 0).toLocaleString('en-NG', { maximumFractionDigits: 2 });
+
+/* ---------- Revenue view ---------- */
+let revLines = [];
+
+function populateRevFilters() {
+  const years = [...new Set(revLines.map(l => l.year).filter(Boolean))].sort((a, b) => b - a);
+  const weeks = [...new Set(revLines.map(l => l.week).filter(Boolean))].sort((a, b) => a - b);
+  const clients = [...new Set(revLines.map(l => l.pharmacy))].sort((a, b) => a.localeCompare(b));
+  $('revYear').innerHTML = '<option value="">All years</option>' +
+    years.map(y => `<option value="${y}">${y}</option>`).join('');
+  if (years.includes(2026)) $('revYear').value = '2026'; // drug-revenue spec covers 2026 orderlines
+  $('revWeek').innerHTML = '<option value="">All weeks</option>' +
+    weeks.map(w => `<option value="${w}">Week ${w}</option>`).join('');
+  $('revClient').innerHTML = '<option value="">All clients</option>' +
+    clients.map(c => `<option value="${c.replace(/"/g, '&quot;')}">${c}</option>`).join('');
+}
+
+function filteredRevLines() {
+  const y = $('revYear').value, m = $('revMonth').value, w = $('revWeek').value;
+  const c = $('revClient').value;
+  const ranged = ($('globalFrom').value || $('globalTo').value)
+    ? revLines.filter(l => inGlobalRange(l.date))
+    : revLines;
+  return ranged
+    .filter(l => (!y || l.year === +y) && (!m || l.month === +m) && (!w || l.week === +w)
+      && (!c || l.pharmacy === c))
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+}
+
+function downloadRevCsv() {
+  const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const rows = filteredRevLines();
+  const lines = [['Product', 'Drug list match', 'Purchase date', 'Client', 'Qty invoiced', 'Total']
+    .map(esc).join(',')].concat(
+    rows.map(l => [l.product, l.drug, l.date || '', l.pharmacy, l.qty, l.total].map(esc).join(',')),
+    [['', '', '', 'Total invoiced', '', rows.reduce((s, l) => s + l.total, 0)].map(esc).join(',')]
+  );
+  const parts = [
+    $('revClient').value && 'client',
+    $('revYear').value && 'y' + $('revYear').value,
+    $('revMonth').value && 'm' + $('revMonth').value,
+    $('revWeek').value && 'w' + $('revWeek').value,
+    $('globalFrom').value && 'from' + $('globalFrom').value,
+    $('globalTo').value && 'to' + $('globalTo').value,
+  ].filter(Boolean).join('_') || 'all';
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `kampe_meds_invoice_lines_${parts}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function renderRevTable(rows) {
+  if (!rows.length) {
+    $('revRows').innerHTML = '<tr><td colspan="5" style="color:var(--muted);padding:16px 14px">No matched invoice lines for this filter.</td></tr>';
+  } else {
+    $('revRows').innerHTML = rows.map(l => `
+      <tr>
+        <td><b>${l.product}</b><br><span style="color:var(--muted);font-size:11.5px">↳ ${l.drug}</span></td>
+        <td style="white-space:nowrap">${l.date ? new Date(l.date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '–'}</td>
+        <td>${l.pharmacy}</td>
+        <td>${fmt(l.qty)}</td>
+        <td style="white-space:nowrap">₦${fmtAmount(l.total)}</td>
+      </tr>`).join('');
+  }
+  const sum = rows.reduce((s, l) => s + l.total, 0);
+  $('revTotal').textContent = '₦' + fmtAmount(sum);
+  $('revNote').textContent = rows.length
+    ? `Showing ${fmt(rows.length)} matched lines (≥${Math.round((revThreshold || 0.85) * 100)}% similarity to the Kampe drug list) · totals in Naira`
+    : 'Totals in Naira';
+  return sum;
+}
+
+let revThreshold = 0.85;
+
+function applyRevFilters() {
+  const sum = renderRevTable(filteredRevLines());
+  $('rKampeMeds').textContent = '₦' + fmtAmount(Math.round(sum));
+  const n = filteredRevLines().length;
+  $('rKampeMedsHint').textContent =
+    `${n} matched invoice line${n === 1 ? '' : 's'} · Odoo orderlines ≥${Math.round(revThreshold * 100)}% similar to the Kampe drug list`;
+}
+
+async function loadRevenue() {
+  try {
+    const res = await fetch('/api/revenue', { cache: 'no-store' });
+    const p = await res.json();
+    if (p.error) throw new Error(p.error);
+    $('rPillometer').textContent = '₦' + fmtAmount(p.kpis.pillometerLiteNGN);
+    $('rPillometerHint').textContent =
+      `${fmt(p.kpis.trainedPharmacies)} trained pharmacies × €${p.kpis.pillometerLiteEUR / p.kpis.trainedPharmacies} @ ₦${p.eurToNgn}/€`;
+    revThreshold = p.meds.matchThreshold || 0.85;
+    revLines = p.meds.lines || [];
+    $('rCards').textContent = '₦' + fmtAmount(p.kpis.cardsRevenueNGN);
+    $('rCardsHint').textContent =
+      `${fmt(p.kpis.cardsSold)} cards sold × 20% of plan cost (plan prices ÷ 100)`;
+    populateRevFilters();
+    applyRevFilters();
+    const names = [...new Set(revLines.map(l => l.product))];
+    const chips = [
+      `Pillometer Lite <b>€${fmt(p.kpis.pillometerLiteEUR)}</b> @ ₦${p.eurToNgn}/€`,
+      `${fmt(p.meds.invoicedRows)} invoiced orderlines scanned · ${fmt(p.meds.matchedRows)} drug-matched · <b>${fmt(p.meds.kampeRows ?? p.meds.matchedRows)}</b> at Kampe pharmacies`,
+      `Matched products: ${names.join(', ') || 'none'}`
+    ];
+    if (p.meds.stale) chips.push(`Source file updated — showing last computed data from ${new Date(p.meds.computedAt).toLocaleString()}`);
+    $('revenueChips').innerHTML = chips.map(c => `<span class="chip">${c}</span>`).join('');
+  } catch (err) {
+    $('revenueChips').innerHTML = `<span class="chip">Revenue data unavailable: ${err.message}</span>`;
+  }
+}
+
+/* ---------- Pharmacies and Enrollments view ---------- */
+function populatePeFilters(p) {
+  $('peYear').innerHTML = '<option value="">All years</option>' +
+    (p.filterYears || []).map(y => `<option value="${y}">${y}</option>`).join('');
+  $('peWeek').innerHTML = '<option value="">All weeks</option>' +
+    (p.filterWeeks || []).map(w => `<option value="${w}">Week ${w}</option>`).join('');
+}
+
+function renderPePlanSummary(rows) {
+  if (!rows.length) {
+    $('pePlanSummary').innerHTML = '<p style="color:var(--muted);font-size:13px">No plan data for this filter.</p>';
+    return;
+  }
+  const maxTotal = Math.max(...rows.map(r => r.total), 1);
+  $('pePlanSummary').innerHTML = rows.map(r => `
+    <div class="stat-row">
+      <span class="st">${r.plan}</span>
+      <span class="mini-bar"><i style="width:${Math.round(r.total / maxTotal * 100)}%"></i></span>
+      <span class="n">${fmt(r.total)}
+        <span style="color:var(--green);font-weight:600">${fmt(r.active)} act</span> ·
+        <span style="color:var(--red);font-weight:600">${fmt(r.expired)} exp</span>
+      </span>
+    </div>`).join('');
+}
+
+let pePivot = [];   // last rendered pivot, also used for the CSV download
+let pePlanCols = [];
+
+function renderPeTable(rows, planOrder) {
+  pePlanCols = planOrder;
+  // Pivot location x plan rows into one row per pharmacy LOCATION, so
+  // same-name branches are never merged
+  const byLoc = new Map();
+  for (const r of rows) {
+    if (!byLoc.has(r.location_id)) {
+      byLoc.set(r.location_id, {
+        pharmacy: r.pharmacy, location: r.location_name, city: r.city, address: r.address,
+        total: 0, active: 0, expired: 0, plans: {},
+      });
+    }
+    const p = byLoc.get(r.location_id);
+    p.total += r.total;
+    p.active += r.active;
+    p.expired += r.expired;
+    p.plans[r.plan] = (p.plans[r.plan] || 0) + r.total;
+  }
+  pePivot = [...byLoc.values()].sort((a, b) => b.total - a.total);
+
+  $('peHead').innerHTML = `<tr>
+    <th>Pharmacy · Location</th><th>Address</th>
+    <th>Total</th><th>Active</th><th>Expired</th>
+    ${pePlanCols.map(pl => `<th>${pl}</th>`).join('')}
+  </tr>`;
+
+  if (!pePivot.length) {
+    $('peRows').innerHTML = `<tr><td colspan="${5 + pePlanCols.length}" style="color:var(--muted);padding:16px 14px">No enrollees for this filter.</td></tr>`;
+  } else {
+    $('peRows').innerHTML = pePivot.map(p => `
+      <tr>
+        <td><b>${p.pharmacy}</b> · ${p.location}<br><span style="color:var(--muted);font-size:11.5px">${p.city}</span></td>
+        <td>${p.address}</td>
+        <td>${fmt(p.total)}</td>
+        <td style="color:var(--green);font-weight:700">${fmt(p.active)}</td>
+        <td style="color:var(--red);font-weight:700">${fmt(p.expired)}</td>
+        ${pePlanCols.map(pl => `<td>${p.plans[pl] ? fmt(p.plans[pl]) : '–'}</td>`).join('')}
+      </tr>`).join('') + `
+      <tr style="background:var(--pink-100)">
+        <td colspan="2" style="text-align:right;font-weight:800;color:var(--pink-700);padding:11px 14px">Totals (${fmt(pePivot.length)} locations)</td>
+        <td style="font-weight:800;color:var(--pink-700)">${fmt(pePivot.reduce((s, p) => s + p.total, 0))}</td>
+        <td style="font-weight:800;color:var(--pink-700)">${fmt(pePivot.reduce((s, p) => s + p.active, 0))}</td>
+        <td style="font-weight:800;color:var(--pink-700)">${fmt(pePivot.reduce((s, p) => s + p.expired, 0))}</td>
+        ${pePlanCols.map(pl => `<td style="font-weight:800;color:var(--pink-700)">${fmt(pePivot.reduce((s, p) => s + (p.plans[pl] || 0), 0))}</td>`).join('')}
+      </tr>`;
+  }
+  $('peNote').textContent = pePivot.length
+    ? `Showing ${fmt(pePivot.length)} individual pharmacy locations (after standard exclusions: test accounts, yopmail signups, Glad Pharmacy, placeholder names)`
+    : 'After standard exclusions: test accounts, yopmail signups, Glad Pharmacy, placeholder names';
+}
+
+function downloadPeCsv() {
+  const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const head = ['Pharmacy', 'Location', 'City', 'Address', 'Total', 'Active', 'Expired', ...pePlanCols];
+  const lines = [head.map(esc).join(',')].concat(
+    pePivot.map(p => [p.pharmacy, p.location, p.city, p.address, p.total, p.active, p.expired,
+      ...pePlanCols.map(pl => p.plans[pl] || 0)].map(esc).join(',')),
+    [[...Array(3)].map(() => '').concat(['Totals',
+      pePivot.reduce((s, p) => s + p.total, 0),
+      pePivot.reduce((s, p) => s + p.active, 0),
+      pePivot.reduce((s, p) => s + p.expired, 0),
+      ...pePlanCols.map(pl => pePivot.reduce((s, p) => s + (p.plans[pl] || 0), 0))].map(esc).join(','))]
+  );
+  const y = $('peYear').value, m = $('peMonth').value, w = $('peWeek').value;
+  const tag = [y && 'y' + y, m && 'm' + m, w && 'w' + w].filter(Boolean).join('_') || 'all';
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `kampe_pharmacy_enrollees_${tag}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+async function loadPharmacyEnrollments() {
+  try {
+    const qs = new URLSearchParams();
+    const y = $('peYear').value, m = $('peMonth').value, w = $('peWeek').value;
+    if (y) qs.set('year', y);
+    if (m) qs.set('month', m);
+    if (w) qs.set('week', w);
+    const gr = globalRangeQs();
+    if (gr.has('from')) qs.set('from', gr.get('from'));
+    if (gr.has('to')) qs.set('to', gr.get('to'));
+    const res = await fetch(`/api/pharmacy-enrollments?${qs}`, { cache: 'no-store' });
+    const p = await res.json();
+    if (p.error) throw new Error(p.error);
+    $('peCoveredPharmacies').textContent = fmt(p.kpis.pharmacies_with_enrollees);
+    $('peAssigned').textContent = fmt(p.kpis.assigned_enrollees);
+    $('peSelf').textContent = fmt(p.kpis.self_enrolled);
+    $('peCoverage').textContent = `${Number(p.kpis.coverage_pct || 0).toFixed(1)}%`;
+    const pk = p.pharmacyKpis || {};
+    $('peMostActive').textContent = pk.mostActive?.label || '–';
+    $('peMostActiveHint').textContent = pk.mostActive ? `${fmt(pk.mostActive.n)} enrollees` : '';
+    $('peNewest').textContent = pk.newest?.label || '–';
+    $('peNewestHint').textContent = pk.newest?.since
+      ? 'Onboarded ' + new Date(pk.newest.since + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+    $('peMostLoc').textContent = pk.mostLocations?.label || '–';
+    $('peMostLocHint').textContent = pk.mostLocations ? `${fmt(pk.mostLocations.n)} locations with enrollees` : '';
+    renderDonut($('pharmacyCoverage'), [
+      { label: 'Assigned', n: p.kpis.assigned_enrollees },
+      { label: 'Unassigned', n: p.kpis.unassigned_enrollees },
+    ], `${Number(p.kpis.coverage_pct || 0).toFixed(1)}%`, 'COVERED');
+    if (!$('peYear').options.length || $('peYear').options.length === 1) populatePeFilters(p);
+    renderPePlanSummary(p.planSummary || []);
+    renderPeTable(p.tableRows || [], (p.planSummary || []).map(r => r.plan));
+    ensurePharmacyTests();
+    const t = (p.planSummary || []).reduce((s, r) => s + r.total, 0);
+    const a = (p.planSummary || []).reduce((s, r) => s + r.active, 0);
+    $('peChips').innerHTML = [
+      `Filtered enrollees <b>${fmt(t)}</b>`,
+      `Active plans <b>${fmt(a)}</b> (${t ? (a / t * 100).toFixed(1) : 0}%)`,
+      `Expired plans <b>${fmt(t - a)}</b>`
+    ].map(c => `<span class="chip">${c}</span>`).join('');
+  } catch (err) {
+    $('peChips').innerHTML = `<span class="chip">Pharmacy enrollment data unavailable: ${err.message}</span>`;
+  }
+}
+
+function renderScreening(el, rows) {
+  if (!rows.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px">No screening data.</p>'; return; }
+  const maxRate = Math.max(...rows.map(r => r.positive / (r.tested || 1)), 0);
+  el.innerHTML = rows.map(r => {
+    const rate = r.positive / (r.tested || 1);
+    return `
+    <div style="padding:12px 0;border-bottom:1px dashed var(--line)">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;font-size:13px">
+        <b style="color:var(--pink-900)">${r.label}</b>
+        <span style="color:var(--muted)">${fmt(r.positive)} of ${fmt(r.tested)} positive</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+        <span class="mini-bar" style="flex:1;width:auto"><i style="width:${maxRate ? Math.round(rate / maxRate * 100) : 0}%"></i></span>
+        <b style="color:var(--pink-700);min-width:52px;text-align:right">${(rate * 100).toFixed(1)}%</b>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderVitals(el, v, visits) {
+  const rows = [
+    { label: 'Weight recorded', n: v.weight },
+    { label: 'Temperature recorded', n: v.temperature },
+    { label: 'BMI recorded', n: v.bmi },
+  ];
+  const bpRate = v.bpVisits ? v.elevatedBpVisits / v.bpVisits : 0;
+  el.innerHTML = rows.map(r => `
+    <div class="stat-row">
+      <span class="st">${r.label}</span>
+      <span class="n">${fmt(r.n)} <span style="color:var(--muted);font-weight:600">(${(r.n / (visits || 1) * 100).toFixed(0)}%)</span></span>
+    </div>`).join('') + `
+    <div style="margin-top:14px;background:var(--pink-100);border:1px solid var(--pink-300);border-radius:12px;padding:12px 14px">
+      <div style="font-size:12px;font-weight:700;color:var(--pink-900)">Elevated blood pressure</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:2px">Systolic ≥140 or diastolic ≥90 mmHg</div>
+      <div style="font-size:22px;font-weight:800;color:var(--pink-700);margin-top:6px">${(bpRate * 100).toFixed(1)}%
+        <span style="font-size:12px;font-weight:600;color:var(--muted)"> · ${fmt(v.elevatedBpVisits)} of ${fmt(v.bpVisits)} visits with BP readings</span>
+      </div>
+    </div>`;
+}
+
+async function loadPocts() {
+  try {
+    const res = await fetch(`/api/pocts?${globalRangeQs()}`, { cache: 'no-store' });
+    const p = await res.json();
+    if (p.error) throw new Error(p.error);
+
+    $('pTests').textContent = fmt(p.kpis.totalTests);
+    $('pVisits').textContent = fmt(p.kpis.visits);
+    $('pPharmacies').textContent = fmt(p.kpis.pharmacies);
+    $('pPerVisit').textContent = p.kpis.testsPerVisit;
+    $('pPositivity').textContent = p.kpis.malariaPositivity + '%';
+
+    renderLineChart($('poctTrend'), p.monthly, 'month');
+    renderScreening($('screening'), p.screening);
+    renderBarChart($('topTests'), p.topTests);
+    renderVitals($('vitals'), p.vitals, p.kpis.visits);
+  } catch (err) {
+    $('poctKpis').insertAdjacentHTML('afterend',
+      `<div class="chips"><span class="chip">POCT data unavailable: ${err.message}</span></div>`);
+  }
+}
+
+/* ---------- Enrollment view ---------- */
+async function loadEnrollment() {
+  try {
+    const group = $('trendGroup').value;
+    const qs = new URLSearchParams({ trend: group });
+    const from = $('enrollFrom').value, to = $('enrollTo').value;
+    const year = $('enrollYear').value, month = $('enrollMonth').value;
+    if (from) qs.set('from', from);
+    if (to) qs.set('to', to);
+    if (!from && $('globalFrom').value) qs.set('from', $('globalFrom').value);
+    if (!to && $('globalTo').value) qs.set('to', $('globalTo').value);
+    if (year) qs.set('year', year);
+    if (month) qs.set('month', month);
+    const res = await fetch(`/api/enrollment?${qs}`, { cache: 'no-store' });
+    const p = await res.json();
+    if (p.error) throw new Error(p.error);
+
+    $('eTotal').textContent = fmt(p.kpis.total);
+    $('eActive').textContent = fmt(p.kpis.active);
+    $('eExpired').textContent = fmt(p.kpis.expired);
+    $('eNew').textContent = fmt(p.kpis.new48h);
+    $('eSelf').textContent = fmt(p.kpis.selfEnrolled);
+
+    const total = p.kpis.total || 1;
+    const female = (p.gender.find(g => g.label === 'female') || { n: 0 }).n;
+    $('enrollChips').innerHTML = [
+      `Average age <b>${p.kpis.avgAge ?? '–'} yrs</b>`,
+      `Female share <b>${(female / total * 100).toFixed(1)}%</b>`,
+      `Self-enrolled share <b>${(p.kpis.selfEnrolled / total * 100).toFixed(1)}%</b>`,
+      `Active plan share <b>${(p.kpis.active / total * 100).toFixed(1)}%</b>`,
+      `New in 48h share <b>${(p.kpis.new48h / total * 100).toFixed(1)}%</b>`
+    ].map(c => `<span class="chip">${c}</span>`).join('');
+
+    renderGender($('genderChart'), p.gender);
+    const split = p.planSplit.slice().sort((a, b) => (a.label === 'active' ? -1 : b.label === 'active' ? 1 : 0));
+    renderDonut($('heroDonut'), split.map(s => ({ ...s, label: s.label[0].toUpperCase() + s.label.slice(1) })),
+      (p.kpis.active / total * 100).toFixed(1) + '%', 'ACTIVE');
+    $('heroActivePct').textContent = (p.kpis.active / total * 100).toFixed(1) + '%';
+    $('heroActiveSub').textContent = `${fmt(p.kpis.active)} active · ${fmt(p.kpis.expired)} expired`;
+    renderDonut($('planNameChart'), p.planNames, fmt(p.kpis.total), 'ENROLLEES');
+    renderLineChart($('enrollTrend'), p.enrollmentTrend.rows, p.enrollmentTrend.group);
+    renderAgeBars($('ageChart'), p.ageBrackets);
+  } catch (err) {
+    $('enrollChips').innerHTML = `<span class="chip">Enrollment data unavailable: ${err.message}</span>`;
+  }
+}
+
+/* ---------- Renewals view ---------- */
+function renderRenewalTrend(el, rows) {
+  if (!rows.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px">No payment data for this range.</p>'; return; }
+  const W = 660, H = 250, padL = 38, padB = 42, padT = 14, padR = 14;
+  const max = Math.max(...rows.map(r => Math.max(r.firsts, r.renewals)), 1);
+  const X = i => padL + (W - padL - padR) * (rows.length === 1 ? 0.5 : i / (rows.length - 1));
+  const Y = v => padT + (H - padB - padT) * (1 - v / max);
+  const labelOf = r => new Date(r.bucket).toLocaleString('en', { month: 'short' }) + " '" + String(new Date(r.bucket).getFullYear()).slice(2);
+  const line = key => rows.map((r, i) => `${X(i).toFixed(1)},${Y(r[key]).toFixed(1)}`).join(' ');
+  const step = Math.max(1, Math.ceil(rows.length / 12));
+  let svg = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img">
+    <line x1="${padL}" y1="${H - padB}" x2="${W - padR}" y2="${H - padB}" stroke="#F3D3E0"/>`;
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + (H - padB - padT) * (1 - i / 4);
+    svg += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="#F3D3E0" stroke-width="1"/>
+            <text class="axis" x="${padL - 6}" y="${y + 3}" text-anchor="end">${Math.round(max * i / 4)}</text>`;
+  }
+  svg += `<polyline points="${line('firsts')}" fill="none" stroke="#D6336C" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+          <polyline points="${line('renewals')}" fill="none" stroke="#2F9E44" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+  rows.forEach((r, i) => {
+    svg += `<circle cx="${X(i).toFixed(1)}" cy="${Y(r.firsts).toFixed(1)}" r="3.5" fill="#8E1E4F"><title>${labelOf(r)}: ${fmt(r.firsts)} first payments</title></circle>
+            <circle cx="${X(i).toFixed(1)}" cy="${Y(r.renewals).toFixed(1)}" r="3.5" fill="#2B8A3E"><title>${labelOf(r)}: ${fmt(r.renewals)} renewals</title></circle>`;
+    if (i % step === 0 || i === rows.length - 1) {
+      svg += `<text class="axis" x="${X(i).toFixed(1)}" y="${H - padB + 16}" text-anchor="middle">${labelOf(r)}</text>`;
+    }
+  });
+  svg += `<text x="${W - padR}" y="${padT + 2}" text-anchor="end" font-size="11" fill="#D6336C" font-weight="700">— first payments</text>
+          <text x="${W - padR}" y="${padT + 16}" text-anchor="end" font-size="11" fill="#2B8A3E" font-weight="700">— renewals</text></svg>`;
+  el.innerHTML = svg;
+}
+
+function renderRenewalPlans(el, rows) {
+  if (!rows.length) { el.innerHTML = '<p style="color:var(--muted);font-size:13px">No plan data.</p>'; return; }
+  const maxRate = Math.max(...rows.map(r => r.rate), 1);
+  el.innerHTML = rows.map(r => `
+    <div class="stat-row">
+      <span class="st">${r.plan}</span>
+      <span class="mini-bar"><i style="width:${Math.round(r.rate / maxRate * 100)}%"></i></span>
+      <span class="n">${r.rate.toFixed(1)}% <span style="color:var(--muted);font-weight:600">${fmt(r.renewers)} of ${fmt(r.payers)}</span></span>
+    </div>`).join('');
+}
+
+async function loadRenewals() {
+  try {
+    const res = await fetch(`/api/renewals?${globalRangeQs()}`, { cache: 'no-store' });
+    const p = await res.json();
+    if (p.error) throw new Error(p.error);
+    $('rnPayments').textContent = fmt(p.kpis.payments);
+    $('rnPayers').textContent = fmt(p.kpis.payers);
+    $('rnRenewals').textContent = fmt(p.kpis.renewals);
+    $('rnRate').textContent = p.kpis.renewalRate + '%';
+    $('rnAmount').textContent = '₦' + fmtAmount(Math.round(p.kpis.renewalAmount / 100));
+    $('rnAvg').textContent = p.kpis.avgPerPayer;
+    const rnShare = p.kpis.payments ? (p.kpis.renewals / p.kpis.payments * 100).toFixed(1) : 0;
+    $('renewalChips').innerHTML = [
+      `First payments <b>${fmt(p.kpis.firstPayments)}</b>`,
+      `Renewals are <b>${rnShare}%</b> of all paid transactions`,
+      `First-payment revenue <b>₦${fmtAmount(Math.round(p.kpis.firstAmount / 100))}</b> · renewal revenue <b>₦${fmtAmount(Math.round(p.kpis.renewalAmount / 100))}</b>`
+    ].map(c => `<span class="chip">${c}</span>`).join('');
+    renderRenewalTrend($('renewalTrend'), p.monthly);
+    renderRenewalPlans($('renewalPlans'), p.plans);
+    const rows = p.topRenewers || [];
+    $('rnRows').innerHTML = rows.length ? rows.map(r => `
+      <tr>
+        <td><b>${r.label}</b></td>
+        <td>${fmt(r.n)}</td>
+        <td>₦${fmtAmount(Math.round(r.total / 100))}</td>
+        <td style="white-space:nowrap">${r.last_pay ? new Date(r.last_pay + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '–'}</td>
+      </tr>`).join('')
+      : '<tr><td colspan="4" style="color:var(--muted);padding:16px 14px">No renewals in this range.</td></tr>';
+    $('rnNote').textContent = rows.length
+      ? `Beneficiaries with more than one paid payment (after standard exclusions incl. 2025 enrollees) · amounts ÷ 100`
+      : 'Renewals = repeat paid payments from the same beneficiary';
+  } catch (err) {
+    $('renewalChips').innerHTML = `<span class="chip">Renewal data unavailable: ${err.message}</span>`;
+  }
+}
+
+/* ---------- Quality Score view ---------- */
+// >=80% -> 5 stars / NGN 30,000 · 60-79.99% -> 3 stars / NGN 20,000 · else 0
+function qBand(pct) {
+  if (pct >= 80) return { stars: 5, payout: 30000 };
+  if (pct >= 60) return { stars: 3, payout: 20000 };
+  return { stars: 0, payout: 0 };
+}
+
+function qHypertensiveBand(pct) {
+  if (pct >= 80) return { stars: 5, payout: 30000 };
+  if (pct >= 50) return { stars: 3, payout: 20000 };
+  return { stars: 0, payout: 0 };
+}
+
+const qStars = n => n ? '★'.repeat(n) + '<span style="opacity:.25">' + '★'.repeat(5 - n) + '</span>' : '<span style="opacity:.25">★★★★★</span>';
+
+function renderQualityTable(tbodyId, noteId, rows, numKey, denKey, label, band = qBand, includeUnscored = false, averageFilter = () => true) {
+  const scored = rows
+    .filter(r => r[denKey] > 0 || (includeUnscored && r[numKey] > 0))
+    .map(r => {
+      const pct = r[denKey] > 0 ? r[numKey] / r[denKey] * 100 : null;
+      return { ...r, pct, ... (pct === null ? { stars: 0, payout: 0 } : band(pct)) };
+    })
+    .sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1));
+  if (!scored.length) {
+    $(tbodyId).innerHTML = `<tr><td colspan="6" style="color:var(--muted);padding:16px 14px">No ${label} data for this range.</td></tr>`;
+    $(noteId).textContent = '';
+    return { scored, payout: 0, fiveStar: 0, averagePct: null };
+  }
+  const totalNumerator = scored.reduce((sum, row) => sum + row[numKey], 0);
+  const totalDenominator = scored.reduce((sum, row) => sum + row[denKey], 0);
+  $(tbodyId).innerHTML = scored.map(r => `
+    <tr>
+      <td><b>${r.pharmacy}</b></td>
+      <td>${fmt(r[numKey])}</td>
+      <td>${fmt(r[denKey])}</td>
+      <td style="font-weight:700">${r.pct === null ? '–' : r.pct.toFixed(1) + '%'}</td>
+      <td style="color:#F59E0B;font-size:15px;letter-spacing:2px;white-space:nowrap">${qStars(r.stars)}</td>
+      <td style="font-weight:800;color:${r.payout ? 'var(--green)' : 'var(--muted)'}">${r.payout ? '₦' + fmt(r.payout) : '₦0'}</td>
+    </tr>`).join('') + `
+    <tr style="background:var(--pink-100)">
+      <td style="text-align:right;font-weight:800;color:var(--pink-700);padding:11px 14px">Totals (${fmt(scored.length)} pharmacies)</td>
+      <td style="font-weight:800;color:var(--pink-700)">${fmt(scored.reduce((s, r) => s + r[numKey], 0))}</td>
+      <td style="font-weight:800;color:var(--pink-700)">${fmt(scored.reduce((s, r) => s + r[denKey], 0))}</td>
+      <td style="font-weight:800;color:var(--pink-700)">${totalDenominator ? (totalNumerator / totalDenominator * 100).toFixed(1) + '%' : '–'}</td>
+      <td style="font-weight:800;color:var(--pink-700)">${scored.filter(r => r.stars === 5).length} × 5★</td>
+      <td style="font-weight:800;color:var(--pink-700)">₦${fmt(scored.reduce((s, r) => s + r.payout, 0))}</td>
+    </tr>`;
+  const payout = scored.reduce((s, r) => s + r.payout, 0);
+  const fiveStar = scored.filter(r => r.stars === 5).length;
+  $(noteId).textContent = `${fmt(scored.length)} pharmacies scored · ${fmt(fiveStar)} at 5 stars · payout ₦${fmt(payout)}`;
+  const averageRows = scored.filter(averageFilter);
+  const averagePct = averageRows.length
+    ? averageRows.reduce((sum, row) => sum + row.pct, 0) / averageRows.length
+    : null;
+  return { scored, payout, fiveStar, averagePct };
+}
+
+function renderQ1Table(rows) {
+  const scored = rows
+    .filter(r => r.adultEnrollees > 0)
+    .map(r => ({ ...r, pct: r.adultsWithBp / r.adultEnrollees * 100, ...qBand(r.adultsWithBp / r.adultEnrollees * 100) }))
+    .sort((a, b) => b.pct - a.pct);
+  if (!scored.length) {
+    $('q1Rows').innerHTML = '<tr><td colspan="8" style="color:var(--muted);padding:16px 14px">No adult enrollees for this range.</td></tr>';
+    $('q1Note').textContent = '';
+    return { scored, payout: 0, fiveStar: 0, averagePct: null };
+  }
+  $('q1Rows').innerHTML = scored.map(r => `
+    <tr>
+      <td><b>${r.pharmacy}</b> · ${r.locationName}</td>
+      <td>${r.address}</td>
+      <td>${fmt(r.adultEnrollees)}</td>
+      <td>${fmt(r.adultsWithBp)}</td>
+      <td>${fmt(r.visits)}</td>
+      <td style="font-weight:700">${r.pct.toFixed(1)}%</td>
+      <td style="color:#F59E0B;font-size:15px;letter-spacing:2px;white-space:nowrap">${qStars(r.stars)}</td>
+      <td style="font-weight:800;color:${r.payout ? 'var(--green)' : 'var(--muted)'}">${r.payout ? '₦' + fmt(r.payout) : '₦0'}</td>
+    </tr>`).join('') + `
+    <tr style="background:var(--pink-100)">
+      <td colspan="2" style="text-align:right;font-weight:800;color:var(--pink-700);padding:11px 14px">Totals (${fmt(scored.length)} locations)</td>
+      <td style="font-weight:800;color:var(--pink-700)">${fmt(scored.reduce((s, r) => s + r.adultEnrollees, 0))}</td>
+      <td style="font-weight:800;color:var(--pink-700)">${fmt(scored.reduce((s, r) => s + r.adultsWithBp, 0))}</td>
+      <td style="font-weight:800;color:var(--pink-700)">${fmt(scored.reduce((s, r) => s + r.visits, 0))}</td>
+      <td style="font-weight:800;color:var(--pink-700)">${(scored.reduce((s, r) => s + r.adultsWithBp, 0) / scored.reduce((s, r) => s + r.adultEnrollees, 0) * 100).toFixed(1)}%</td>
+      <td style="font-weight:800;color:var(--pink-700)">${scored.filter(r => r.stars === 5).length} × 5★</td>
+      <td style="font-weight:800;color:var(--pink-700)">₦${fmt(scored.reduce((s, r) => s + r.payout, 0))}</td>
+    </tr>`;
+  const payout = scored.reduce((s, r) => s + r.payout, 0);
+  const fiveStar = scored.filter(r => r.stars === 5).length;
+  $('q1Note').textContent = `${fmt(scored.length)} locations scored · ${fmt(fiveStar)} at 5 stars · payout ₦${fmt(payout)} · BP-test activities are matched at the parent pharmacy level`;
+  const averageRows = scored.filter(row => row.visits > 0);
+  const averagePct = averageRows.length
+    ? averageRows.reduce((sum, row) => sum + row.pct, 0) / averageRows.length
+    : null;
+  return { scored, payout, fiveStar, averagePct };
+}
+
+function downloadQualityTableCsv(tableId, fileName) {
+  const table = $(tableId);
+  const escapeCsv = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
+  const lines = Array.from(table.querySelectorAll('tr'), row =>
+    Array.from(row.cells, cell => escapeCsv(cell.textContent.replace(/\s+/g, ' ').trim())).join(','));
+  const range = [
+    $('globalFrom').value && `from-${$('globalFrom').value}`,
+    $('globalTo').value && `to-${$('globalTo').value}`,
+  ].filter(Boolean).join('_');
+  const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `${fileName}${range ? '_' + range : ''}.csv`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+async function loadQuality() {
+  try {
+    const res = await fetch(`/api/quality?${globalRangeQs()}`, { cache: 'no-store' });
+    const p = await res.json();
+    if (p.error) throw new Error(p.error);
+    const rows = p.rows || [];
+    const q1 = renderQ1Table(p.bpLocations || []);
+    const hasVisits = row => row.visits > 0;
+    const q2 = renderQualityTable('q2Rows', 'q2Note', rows, 'htnRx', 'highBpVisits', 'hypertensive prescription', qHypertensiveBand, false, hasVisits);
+    const q3 = renderQualityTable('q3Rows', 'q3Note', rows, 'bpTests', 'visits', 'BP test coverage', qBand, false, hasVisits);
+    const q4 = renderQualityTable('q4Rows', 'q4Note', rows, 'malariaRx', 'malariaTests', 'mRDT + malaria Rx', qBand, false, hasVisits);
+    const totalPayout = q1.payout + q2.payout + q3.payout + q4.payout;
+    $('qTotalPayout').textContent = '₦' + fmt(totalPayout);
+    $('qFiveStar').textContent = fmt(q1.fiveStar);
+    $('qScored').textContent = fmt(rows.length);
+    const qAverages = [q1.averagePct, q2.averagePct, q3.averagePct, q4.averagePct];
+    qAverages.forEach((average, index) => {
+      $(`q${index + 1}Average`).textContent = Number.isFinite(average) ? average.toFixed(1) + '%' : '–';
+    });
+    const measureScores = qAverages.filter(Number.isFinite);
+    $('qAverageScore').textContent = measureScores.length
+      ? (measureScores.reduce((sum, score) => sum + score, 0) / measureScores.length).toFixed(1) + '%' : '–';
+    $('qualityChips').innerHTML = [
+      `BP measurement payout <b>₦${fmt(q1.payout)}</b>`,
+      `Hypertensive Rx payout <b>₦${fmt(q2.payout)}</b>`,
+      `BP readings payout <b>₦${fmt(q3.payout)}</b>`,
+      `mRDT + Rx payout <b>₦${fmt(q4.payout)}</b>`
+    ].map(c => `<span class="chip">${c}</span>`).join('');
+  } catch (err) {
+    $('qualityChips').innerHTML = `<span class="chip">Quality data unavailable: ${err.message}</span>`;
+  }
+}
+
+/* ---------- Malaria positive cases ---------- */
+let malariaRows = [];
+const escHtml = s => String(s ?? '').replace(/[&<>"']/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function renderMalaria() {
+  const q = $('malariaSearch').value.trim().toLowerCase();
+  const filtered = q
+    ? malariaRows.filter(r => (r.beneficiary + ' ' + r.pharmacy + ' ' + (r.drugs || '')).toLowerCase().includes(q))
+    : malariaRows;
+  $('malariaBody').innerHTML = filtered.map(r => `<tr>
+    <td style="white-space:nowrap">${new Date(r.date + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+    <td>${escHtml(r.beneficiary) || '—'}</td>
+    <td>${escHtml(r.pharmacy)}</td>
+    <td>${escHtml(r.drugs) || '—'}</td>
+  </tr>`).join('');
+  const withRx = malariaRows.filter(r => r.drugs).length;
+  $('malariaNote').textContent = `${fmt(filtered.length)} of ${fmt(malariaRows.length)} cases shown · ${fmt(withRx)} with an antimalarial purchase on record`;
+}
+
+async function loadMalaria() {
+  try {
+    const res = await fetch(`/api/malaria-cases?${globalRangeQs()}`, { cache: 'no-store' });
+    const p = await res.json();
+    if (p.error) throw new Error(p.error);
+    malariaRows = p.rows || [];
+    $('mPosTotal').textContent = fmt(p.total ?? malariaRows.length);
+    renderMalaria();
+  } catch (err) {
+    $('malariaNote').textContent = 'Malaria case data unavailable: ' + err.message;
+  }
+}
+
+function downloadMalariaCsv() {
+  const escCsv = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const lines = ['Date,Beneficiary Name,Pharmacy,Prescribed Drug'];
+  malariaRows.forEach(r => lines.push([r.date, r.beneficiary, r.pharmacy, r.drugs || ''].map(escCsv).join(',')));
+  const range = [$('globalFrom').value, $('globalTo').value].filter(Boolean).join('_');
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `kampe_malaria_cases${range ? '_' + range : ''}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---------- High BP (>140 systolic) ---------- */
+let highBpRows = [];
+
+function renderHighBp() {
+  const q = $('highBpSearch').value.trim().toLowerCase();
+  const filtered = q
+    ? highBpRows.filter(r => (r.beneficiary + ' ' + r.pharmacy + ' ' + (r.drugs || '')).toLowerCase().includes(q))
+    : highBpRows;
+  $('highBpBody').innerHTML = filtered.map(r => `<tr>
+    <td style="white-space:nowrap">${new Date(r.date + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</td>
+    <td>${escHtml(r.beneficiary) || '—'}</td>
+    <td>${escHtml(r.pharmacy)}</td>
+    <td>${r.systolic}</td>
+    <td>${r.diastolic ?? '—'}</td>
+    <td>${escHtml(r.drugs) || '—'}</td>
+  </tr>`).join('');
+  const withRx = highBpRows.filter(r => r.drugs).length;
+  $('highBpNote').textContent = `${fmt(filtered.length)} of ${fmt(highBpRows.length)} high BP visits shown · ${fmt(withRx)} with an antihypertensive purchase on record`;
+}
+
+async function loadHighBp() {
+  try {
+    const res = await fetch(`/api/high-bp?${globalRangeQs()}`, { cache: 'no-store' });
+    const p = await res.json();
+    if (p.error) throw new Error(p.error);
+    highBpRows = p.rows || [];
+    renderHighBp();
+  } catch (err) {
+    $('highBpNote').textContent = 'High BP data unavailable: ' + err.message;
+  }
+}
+
+function downloadHighBpCsv() {
+  const escCsv = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const lines = ['Date,Beneficiary Name,Pharmacy,Systolic BP,Diastolic BP,Prescribed Drug'];
+  highBpRows.forEach(r => lines.push([r.date, r.beneficiary, r.pharmacy, r.systolic, r.diastolic ?? '', r.drugs || ''].map(escCsv).join(',')));
+  const range = [$('globalFrom').value, $('globalTo').value].filter(Boolean).join('_');
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `kampe_high_bp${range ? '_' + range : ''}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ---------- Data loading ---------- */
+async function loadData() {
+  const status = $('status');
+  status.textContent = 'Connecting to Kampe database…';
+  try {
+    const window = $('windowSelect').value;
+    const res = await fetch(`/api/pharmacy-profiles?window=${window}&${globalRangeQs()}`, { cache: 'no-store' });
+    const payload = await res.json();
+    if (payload.error) throw new Error(payload.error);
+
+    $('kOnboarded').textContent = fmt(payload.kpis.onboarded);
+    $('kTrained').textContent = fmt(payload.kpis.trained);
+    $('kWithEnrollees').textContent = fmt(payload.kpis.withEnrollees);
+    $('kActive').textContent = fmt(payload.kpis.active);
+    $('kInactive').textContent = fmt(payload.kpis.inactive);
+    $('kPct').textContent = payload.kpis.pctActive + '%';
+
+    renderBarChart($('trendChart'), payload.trend);
+    renderCities($('cityList'), payload.cities);
+    ledgerRows = payload.ledger || [];
+    renderLedger();
+
+    const t = new Date().toLocaleString();
+    status.innerHTML = `Live from Kampe Postgres · refreshed ${t} · active window: <b>last ${payload.windowDays} days</b>`;
+  } catch (err) {
+    status.textContent = 'Database unavailable: ' + err.message;
+  }
+}
+
+// Populate the year dropdown from the earliest enrollee record up to the current year
+(async () => {
+  try {
+    const res = await fetch('/api/enrollment?trend=year', { cache: 'no-store' });
+    const p = await res.json();
+    const years = (p.enrollmentTrend.rows || []).map(r => new Date(r.bucket).getFullYear());
+    const first = years.length ? Math.min(...years) : new Date().getFullYear();
+    const opts = [];
+    for (let y = new Date().getFullYear(); y >= first; y--) opts.push(`<option value="${y}">${y}</option>`);
+    $('enrollYear').insertAdjacentHTML('beforeend', opts.join(''));
+  } catch (e) { /* leave just "All years" */ }
+})();
+
+$('windowSelect').addEventListener('change', loadData);
+['globalFrom', 'globalTo'].forEach(id =>
+  $(id).addEventListener('change', reloadAll));
+$('ledgerSearch').addEventListener('input', renderLedger);
+$('trendGroup').addEventListener('change', loadEnrollment);
+['enrollFrom', 'enrollTo', 'enrollYear', 'enrollMonth'].forEach(id =>
+  $(id).addEventListener('change', loadEnrollment));
+['revYear', 'revMonth', 'revWeek', 'revClient'].forEach(id =>
+  $(id).addEventListener('change', applyRevFilters));
+$('revDownload').addEventListener('click', downloadRevCsv);
+['peYear', 'peMonth', 'peWeek'].forEach(id =>
+  $(id).addEventListener('change', loadPharmacyEnrollments));
+$('peDownload').addEventListener('click', downloadPeCsv);
+$('ptDownload').addEventListener('click', downloadPtCsv);
+$('tpDownload').addEventListener('click', downloadTpCsv);
+[
+  ['q1Download', 'q1Table', 'quality_q1_bp_measurement'],
+  ['q2Download', 'q2Table', 'quality_q2_hypertensive_rx'],
+  ['q3Download', 'q3Table', 'quality_q3_bp_test_coverage'],
+  ['q4Download', 'q4Table', 'quality_q4_malaria_treatment'],
+].forEach(([buttonId, tableId, fileName]) =>
+  $(buttonId).addEventListener('click', () => downloadQualityTableCsv(tableId, fileName)));
+$('malariaSearch').addEventListener('input', renderMalaria);
+$('malariaDownload').addEventListener('click', downloadMalariaCsv);
+$('highBpSearch').addEventListener('input', renderHighBp);
+$('highBpDownload').addEventListener('click', downloadHighBpCsv);
+loadData();
+loadEnrollment();
+loadPocts();
+loadActivities();
+loadRevenue();
+loadPharmacyEnrollments();
+loadRenewals();
+loadQuality();
+loadMalaria();
+loadHighBp();
+</script>
+</body>
+</html>

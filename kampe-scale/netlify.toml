@@ -1,0 +1,10 @@
+[build]
+  publish = "public"
+  functions = "functions"
+
+# The dashboard calls same-origin /api/* endpoints; route them to the
+# serverless Express app.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
