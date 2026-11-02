@@ -141,6 +141,8 @@ tbody tr:hover{background:var(--pink-100)}
 .global-range label{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);border-radius:999px;padding:5px 12px;color:#fff}
 .global-range input{border:0;background:transparent;color:#fff;font:700 12px "Montserrat",sans-serif;outline:0;cursor:pointer}
 .global-range input::-webkit-calendar-picker-indicator{filter:invert(1);cursor:pointer}
+.global-range select{border:0;background:transparent;color:#fff;font:700 12px "Montserrat",sans-serif;outline:0;cursor:pointer;max-width:210px}
+.global-range select option{color:#3D0A1E}
 footer{text-align:center;font-size:11px;color:var(--muted);padding:18px 0 26px}
 
 /* ---------- Enrollment filters ---------- */
@@ -223,6 +225,7 @@ footer{text-align:center;font-size:11px;color:var(--muted);padding:18px 0 26px}
   <div class="global-range" title="Applies to every page">
     <label>From <input type="date" id="globalFrom"></label>
     <label>To <input type="date" id="globalTo"></label>
+    <label>Week <select id="globalWeek"><option value="">All weeks</option></select></label>
   </div>
 </header>
 
@@ -748,6 +751,37 @@ function inGlobalRange(dateStr) {
   if (!dateStr) return false;
   const f = $('globalFrom').value, t = $('globalTo').value;
   return (!f || dateStr >= f) && (!t || dateStr <= t);
+}
+
+/* ---------- Week-of-year filter (header) ---------- */
+// ISO-8601 weeks (Monday start). Selecting a week sets the global From/To
+// date range to that week, so every page reuses the existing date filtering.
+function isoWeekMonday(year, week) {
+  const jan4 = new Date(year, 0, 4);
+  const dow = jan4.getDay() || 7;            // 1 = Monday ... 7 = Sunday
+  const week1 = new Date(jan4);
+  week1.setDate(jan4.getDate() - dow + 1);   // Monday of ISO week 1
+  const monday = new Date(week1);
+  monday.setDate(week1.getDate() + (week - 1) * 7);
+  return monday;
+}
+const isoDateStr = d =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const shortDate = d => `${d.getDate()} ${d.toLocaleString('en', { month: 'short' })}`;
+
+function populateGlobalWeeks(firstYear) {
+  const thisYear = new Date().getFullYear();
+  const opts = ['<option value="">All weeks</option>'];
+  for (let y = thisYear; y >= firstYear; y--) {
+    const weeksInYear = isoWeekMonday(y, 53).getFullYear() === y ? 53 : 52;
+    for (let w = weeksInYear; w >= 1; w--) {
+      const mon = isoWeekMonday(y, w);
+      const sun = new Date(mon);
+      sun.setDate(mon.getDate() + 6);
+      opts.push(`<option value="${y}-W${w}">${y} · W${String(w).padStart(2, '0')} (${shortDate(mon)}–${shortDate(sun)})</option>`);
+    }
+  }
+  $('globalWeek').innerHTML = opts.join('');
 }
 
 function reloadAll() {
@@ -1879,12 +1913,38 @@ async function loadData() {
     const opts = [];
     for (let y = new Date().getFullYear(); y >= first; y--) opts.push(`<option value="${y}">${y}</option>`);
     $('enrollYear').insertAdjacentHTML('beforeend', opts.join(''));
+    populateGlobalWeeks(first);
   } catch (e) { /* leave just "All years" */ }
 })();
 
 $('windowSelect').addEventListener('change', loadData);
 ['globalFrom', 'globalTo'].forEach(id =>
-  $(id).addEventListener('change', reloadAll));
+  $(id).addEventListener('change', () => {
+    // Manual date edit overrides (and clears) the week-of-year selection
+    delete $(id).dataset.byWeek;
+    if ($('globalWeek').value) $('globalWeek').value = '';
+    reloadAll();
+  }));
+$('globalWeek').addEventListener('change', () => {
+  const v = $('globalWeek').value;
+  const fromEl = $('globalFrom'), toEl = $('globalTo');
+  if (v) {
+    const [y, w] = v.split('-W').map(Number);
+    const mon = isoWeekMonday(y, w);
+    const sun = new Date(mon);
+    sun.setDate(mon.getDate() + 6);
+    fromEl.value = isoDateStr(mon);
+    toEl.value = isoDateStr(sun);
+    fromEl.dataset.byWeek = '1';
+    reloadAll();
+  } else if (fromEl.dataset.byWeek) {
+    // "All weeks" only clears dates that the week selector itself set
+    fromEl.value = '';
+    toEl.value = '';
+    delete fromEl.dataset.byWeek;
+    reloadAll();
+  }
+});
 $('ledgerSearch').addEventListener('input', renderLedger);
 $('trendGroup').addEventListener('change', loadEnrollment);
 ['enrollFrom', 'enrollTo', 'enrollYear', 'enrollMonth'].forEach(id =>
