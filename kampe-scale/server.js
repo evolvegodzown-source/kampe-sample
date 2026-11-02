@@ -189,6 +189,49 @@ app.get('/api/enrollment', wrap(async (req, res) => {
   });
 }));
 
+// Per-enrollee roster for the Enrollment page breakdown table: pharmacy,
+// enrollee, plan, canvasser, plan status and expiry. Same filters and
+// exclusions as /api/enrollment.
+app.get('/api/enrollment-roster', wrap(async (req, res) => {
+  const conds = [], vals = [];
+  const { from, to, year, month } = req.query;
+  if (from && /^\d{4}-\d{2}-\d{2}$/.test(from)) { vals.push(from); conds.push('b.created_at >= $IDX::date'); }
+  if (to && /^\d{4}-\d{2}-\d{2}$/.test(to)) { vals.push(to); conds.push('b.created_at < $IDX::date + INTERVAL \'1 day\''); }
+  if (year && /^\d{4}$/.test(year)) { vals.push(year); conds.push('EXTRACT(YEAR FROM b.created_at) = $IDX::int'); }
+  if (month && /^(0?[1-9]|1[0-2])$/.test(month)) { vals.push(month); conds.push('EXTRACT(MONTH FROM b.created_at) = $IDX::int'); }
+  const FILTER = conds.length
+    ? ` AND ${conds.map((c, i) => c.replace('IDX', String(i + 1))).join(' AND ')}`
+    : '';
+  const { rows } = await pool.query(`
+    SELECT
+      COALESCE(NULLIF(TRIM(b.pharmacy_name), ''), 'Unassigned') AS pharmacy,
+      NULLIF(TRIM(CONCAT(b.first_name, ' ', b.last_name)), '') AS enrollee,
+      COALESCE(NULLIF(TRIM(b.plan_name), ''), 'Unspecified') AS plan,
+      CASE WHEN cv.id IS NULL THEN NULL
+           ELSE NULLIF(TRIM(CONCAT(cv.first_name, ' ', cv.last_name)), '') END AS canvasser,
+      b.policy_status AS status,
+      sub.expires_at,
+      CASE WHEN sub.expires_at IS NULL THEN NULL
+           ELSE sub.expires_at - CURRENT_DATE END AS days_to_expiry
+    FROM (
+      SELECT ben.*, p.name AS pharmacy_name
+      ${ENROLLEE_BASE.replace('company_beneficiary b', 'company_beneficiary ben').replace(/b\./g, 'ben.')}
+    ) b
+    LEFT JOIN company_canvasser cv ON cv.id = b.canvasser_id
+    LEFT JOIN LATERAL (
+      SELECT to_timestamp(s.expires_at)::date AS expires_at
+      FROM payment_kampesubscription s
+      WHERE s.beneficiary_id = b.id
+        AND s.is_cancelled IS NOT TRUE
+        AND s.expires_at IS NOT NULL
+      ORDER BY s.expires_at DESC LIMIT 1
+    ) sub ON true
+    ${FILTER}
+    ORDER BY b.created_at DESC
+    LIMIT 5000`, vals);
+  res.json({ rows, total: rows.length });
+}));
+
 // Enrollee activity (claims) KPIs and charts, fed live from
 // company_beneficiaryactivity. Glad Pharmacy (id 1225) is excluded, as are
 // claims belonging to 2025-created enrollees.

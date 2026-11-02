@@ -88,6 +88,11 @@ tbody td{padding:9px 14px;border-bottom:1px solid var(--pink-50);color:var(--ink
 tbody tr:nth-child(even){background:var(--pink-50)}
 tbody tr:hover{background:var(--pink-100)}
 .ledger-note{font-size:11.5px;color:var(--muted);margin-top:10px}
+.st-pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap}
+.st-active{background:rgba(16,185,129,.14);color:#0f766e}
+.st-expired{background:rgba(239,68,68,.12);color:#b91c1c}
+.exp-danger{color:#b91c1c;font-weight:700}
+.exp-warning{color:#b45309;font-weight:700}
 .dl-btn{border:1.5px solid var(--pink-500);background:var(--pink-50);color:var(--pink-700);border-radius:999px;padding:8px 18px;font:700 12.5px "Montserrat",sans-serif;cursor:pointer;white-space:nowrap}
 .dl-btn:hover{background:var(--pink-100)}
 
@@ -366,6 +371,23 @@ footer{text-align:center;font-size:11px;color:var(--muted);padding:18px 0 26px}
         <h3>Plans<span class="sub">enrollees per plan</span></h3>
         <div id="planNameChart"></div>
       </div>
+    </div>
+
+    <div class="panel">
+      <div class="ledger-head">
+        <h3>Enrollment Breakdown<span class="sub" style="font-weight:500">per enrollee</span></h3>
+        <input type="search" id="rosterSearch" placeholder="Search pharmacy, enrollee, plan or canvasser…" aria-label="Search enrollment breakdown">
+      </div>
+      <div class="table-wrap">
+        <table id="rosterTable">
+          <thead><tr>
+            <th>Pharmacy</th><th>Enrollee</th><th>Plan</th><th>Canvasser</th>
+            <th>Plan Status</th><th>Days to Expiry</th><th>Expiry Date</th>
+          </tr></thead>
+          <tbody id="rosterBody"></tbody>
+        </table>
+      </div>
+      <div class="ledger-note" id="rosterNote"></div>
     </div>
   </section>
 
@@ -1552,9 +1574,57 @@ async function loadEnrollment() {
     renderDonut($('planNameChart'), p.planNames, fmt(p.kpis.total), 'ENROLLEES');
     renderLineChart($('enrollTrend'), p.enrollmentTrend.rows, p.enrollmentTrend.group);
     renderAgeBars($('ageChart'), p.ageBrackets);
+
+    // Enrollment breakdown table (per enrollee) — same filters as the KPIs
+    try {
+      const rres = await fetch(`/api/enrollment-roster?${qs}`, { cache: 'no-store' });
+      const rp = await rres.json();
+      if (rp.error) throw new Error(rp.error);
+      rosterRows = rp.rows || [];
+    } catch (rerr) {
+      rosterRows = [];
+      $('rosterNote').textContent = 'Enrollment breakdown unavailable: ' + rerr.message;
+    }
+    renderRoster();
   } catch (err) {
     $('enrollChips').innerHTML = `<span class="chip">Enrollment data unavailable: ${err.message}</span>`;
   }
+}
+
+/* ---------- Enrollment breakdown table (per enrollee) ---------- */
+let rosterRows = [];
+
+function fmtExpiryDate(v) {
+  if (!v) return '–';
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return String(v).slice(0, 10);
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function renderRoster() {
+  const q = $('rosterSearch').value.trim().toLowerCase();
+  const rows = q
+    ? rosterRows.filter(r => [r.pharmacy, r.enrollee, r.plan, r.canvasser]
+        .some(v => (v || '').toLowerCase().includes(q)))
+    : rosterRows;
+  const toShow = rows.slice(0, 300);
+  $('rosterBody').innerHTML = toShow.map(r => {
+    const active = r.status === 'active';
+    const days = r.days_to_expiry;
+    const daysCls = days == null ? '' : days <= 0 ? 'exp-danger' : days <= 7 ? 'exp-warning' : '';
+    return `<tr>
+      <td>${r.pharmacy || '–'}</td>
+      <td>${r.enrollee || '–'}</td>
+      <td>${r.plan || '–'}</td>
+      <td>${r.canvasser || '–'}</td>
+      <td><span class="st-pill ${active ? 'st-active' : 'st-expired'}">${active ? 'Active' : 'Expired'}</span></td>
+      <td class="${daysCls}">${days == null ? '–' : days}</td>
+      <td>${fmtExpiryDate(r.expires_at)}</td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:22px">No enrollees match your search.</td></tr>`;
+  $('rosterNote').textContent = `Total enrolled (this filter): ${fmt(rows.length)} · showing ${fmt(toShow.length)}` +
+    (rosterRows.length >= 5000 ? ' (capped at 5,000 — narrow the filters)' : '') +
+    ' · excludes inactive policies, yopmail emails and Glad Pharmacy enrollees';
 }
 
 /* ---------- Renewals view ---------- */
@@ -1946,6 +2016,7 @@ $('globalWeek').addEventListener('change', () => {
   }
 });
 $('ledgerSearch').addEventListener('input', renderLedger);
+$('rosterSearch').addEventListener('input', renderRoster);
 $('trendGroup').addEventListener('change', loadEnrollment);
 ['enrollFrom', 'enrollTo', 'enrollYear', 'enrollMonth'].forEach(id =>
   $(id).addEventListener('change', loadEnrollment));
