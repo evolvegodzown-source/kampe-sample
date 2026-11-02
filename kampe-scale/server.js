@@ -226,6 +226,7 @@ app.get('/api/enrollment-roster', wrap(async (req, res) => {
         AND s.expires_at IS NOT NULL
       ORDER BY s.expires_at DESC LIMIT 1
     ) sub ON true
+    WHERE TRUE
     ${FILTER}
     ORDER BY b.created_at DESC
     LIMIT 5000`, vals);
