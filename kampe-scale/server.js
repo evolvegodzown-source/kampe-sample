@@ -206,6 +206,7 @@ app.get('/api/enrollment-roster', wrap(async (req, res) => {
     SELECT
       COALESCE(NULLIF(TRIM(b.pharmacy_name), ''), 'Unassigned') AS pharmacy,
       NULLIF(TRIM(CONCAT(b.first_name, ' ', b.last_name)), '') AS enrollee,
+      NULLIF(TRIM(b.phone_number), '') AS phone,
       COALESCE(NULLIF(TRIM(b.plan_name), ''), 'Unspecified') AS plan,
       CASE WHEN cv.id IS NULL THEN NULL
            ELSE NULLIF(TRIM(CONCAT(cv.first_name, ' ', cv.last_name)), '') END AS canvasser,

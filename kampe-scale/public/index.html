@@ -189,7 +189,12 @@ footer{text-align:center;font-size:11px;color:var(--muted);padding:18px 0 26px}
 </div>
 <script>
 (function () {
-  var USER = 'kampe', PASS = 'kampe123', KEY = 'kampe_auth';
+  // Two accounts: 'kampe' sees every tab; 'guest' (external) sees only Enrollment.
+  var USERS = {
+    kampe: { pass: 'kampe123', role: 'full' },
+    guest: { pass: 'guest123', role: 'guest' }
+  };
+  var KEY = 'kampe_auth', GUEST_VIEW = 'enrollees';
   var overlay = document.getElementById('loginOverlay');
   function show() {
     overlay.style.display = 'flex';
@@ -199,14 +204,35 @@ footer{text-align:center;font-size:11px;color:var(--muted);padding:18px 0 26px}
     overlay.style.display = 'none';
     document.body.style.overflow = '';
   }
-  if (sessionStorage.getItem(KEY) !== '1') show();
+  function applyRole(role) {
+    if (role !== 'guest') return;
+    // Hide every tab except Enrollment and force that view active.
+    document.querySelectorAll('#nav button').forEach(function (b) {
+      b.style.display = b.dataset.view === GUEST_VIEW ? '' : 'none';
+    });
+    document.querySelectorAll('#nav button').forEach(function (b) {
+      b.classList.toggle('active', b.dataset.view === GUEST_VIEW);
+    });
+    document.querySelectorAll('.view').forEach(function (v) {
+      v.classList.remove('active');
+    });
+    var v = document.getElementById('view-' + GUEST_VIEW);
+    if (v) v.classList.add('active');
+  }
+  var session = sessionStorage.getItem(KEY);
+  if (session !== 'full' && session !== 'guest') {
+    show();
+  } else {
+    document.addEventListener('DOMContentLoaded', function () { applyRole(session); });
+  }
   document.getElementById('loginForm').addEventListener('submit', function (e) {
     e.preventDefault();
     var u = document.getElementById('loginUser').value.trim();
     var p = document.getElementById('loginPass').value;
-    if (u === USER && p === PASS) {
-      sessionStorage.setItem(KEY, '1');
+    if (USERS[u] && USERS[u].pass === p) {
+      sessionStorage.setItem(KEY, USERS[u].role);
       hide();
+      applyRole(USERS[u].role);
     } else {
       document.getElementById('loginError').style.display = 'block';
     }
@@ -376,12 +402,15 @@ footer{text-align:center;font-size:11px;color:var(--muted);padding:18px 0 26px}
     <div class="panel">
       <div class="ledger-head">
         <h3>Enrollment Breakdown<span class="sub" style="font-weight:500">per enrollee</span></h3>
-        <input type="search" id="rosterSearch" placeholder="Search pharmacy, enrollee, plan or canvasser…" aria-label="Search enrollment breakdown">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <input type="search" id="rosterSearch" placeholder="Search pharmacy, enrollee, phone, plan or canvasser…" aria-label="Search enrollment breakdown">
+          <button id="rosterDownload" class="dl-btn" type="button">Download CSV</button>
+        </div>
       </div>
       <div class="table-wrap">
         <table id="rosterTable">
           <thead><tr>
-            <th>Pharmacy</th><th>Enrollee</th><th>Plan</th><th>Canvasser</th>
+            <th>Pharmacy</th><th>Enrollee</th><th>Phone</th><th>Plan</th><th>Canvasser</th>
             <th>Plan Status</th><th>Days to Expiry</th><th>Expiry Date</th>
           </tr></thead>
           <tbody id="rosterBody"></tbody>
@@ -1601,12 +1630,16 @@ function fmtExpiryDate(v) {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function renderRoster() {
+function filterRoster() {
   const q = $('rosterSearch').value.trim().toLowerCase();
-  const rows = q
-    ? rosterRows.filter(r => [r.pharmacy, r.enrollee, r.plan, r.canvasser]
+  return q
+    ? rosterRows.filter(r => [r.pharmacy, r.enrollee, r.phone, r.plan, r.canvasser]
         .some(v => (v || '').toLowerCase().includes(q)))
     : rosterRows;
+}
+
+function renderRoster() {
+  const rows = filterRoster();
   const toShow = rows.slice(0, 300);
   $('rosterBody').innerHTML = toShow.map(r => {
     const active = r.status === 'active';
@@ -1615,16 +1648,37 @@ function renderRoster() {
     return `<tr>
       <td>${r.pharmacy || '–'}</td>
       <td>${r.enrollee || '–'}</td>
+      <td>${r.phone || '–'}</td>
       <td>${r.plan || '–'}</td>
       <td>${r.canvasser || '–'}</td>
       <td><span class="st-pill ${active ? 'st-active' : 'st-expired'}">${active ? 'Active' : 'Expired'}</span></td>
       <td class="${daysCls}">${days == null ? '–' : days}</td>
       <td>${fmtExpiryDate(r.expires_at)}</td>
     </tr>`;
-  }).join('') || `<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:22px">No enrollees match your search.</td></tr>`;
+  }).join('') || `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:22px">No enrollees match your search.</td></tr>`;
   $('rosterNote').textContent = `Total enrolled (this filter): ${fmt(rows.length)} · showing ${fmt(toShow.length)}` +
     (rosterRows.length >= 5000 ? ' (capped at 5,000 — narrow the filters)' : '') +
     ' · excludes inactive policies, yopmail emails and Glad Pharmacy enrollees';
+}
+
+function downloadRosterCsv() {
+  const rows = filterRoster();
+  const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const head = ['Pharmacy', 'Enrollee', 'Phone', 'Plan', 'Canvasser', 'Plan Status', 'Days to Expiry', 'Expiry Date'];
+  const lines = [head.map(esc).join(',')].concat(rows.map(r => [
+    r.pharmacy || '', r.enrollee || '', r.phone || '', r.plan || '', r.canvasser || '',
+    r.status === 'active' ? 'Active' : 'Expired',
+    r.days_to_expiry == null ? '' : r.days_to_expiry,
+    r.expires_at ? String(r.expires_at).slice(0, 10) : ''
+  ].map(esc).join(',')));
+  const from = $('globalFrom').value, to = $('globalTo').value;
+  const tag = [from && 'from' + from, to && 'to' + to].filter(Boolean).join('_') || 'all';
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `kampe_enrollment_roster_${tag}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 /* ---------- Renewals view ---------- */
@@ -2017,6 +2071,7 @@ $('globalWeek').addEventListener('change', () => {
 });
 $('ledgerSearch').addEventListener('input', renderLedger);
 $('rosterSearch').addEventListener('input', renderRoster);
+$('rosterDownload').addEventListener('click', downloadRosterCsv);
 $('trendGroup').addEventListener('change', loadEnrollment);
 ['enrollFrom', 'enrollTo', 'enrollYear', 'enrollMonth'].forEach(id =>
   $(id).addEventListener('change', loadEnrollment));
