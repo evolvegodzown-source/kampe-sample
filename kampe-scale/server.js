@@ -211,6 +211,7 @@ app.get('/api/enrollment-roster', wrap(async (req, res) => {
       CASE WHEN cv.id IS NULL THEN NULL
            ELSE NULLIF(TRIM(CONCAT(cv.first_name, ' ', cv.last_name)), '') END AS canvasser,
       b.policy_status AS status,
+      b.created_at::date AS created_at,
       sub.expires_at,
       CASE WHEN sub.expires_at IS NULL THEN NULL
            ELSE sub.expires_at - CURRENT_DATE END AS days_to_expiry

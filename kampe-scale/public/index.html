@@ -411,7 +411,7 @@ footer{text-align:center;font-size:11px;color:var(--muted);padding:18px 0 26px}
         <table id="rosterTable">
           <thead><tr>
             <th>Pharmacy</th><th>Enrollee</th><th>Phone</th><th>Plan</th><th>Canvasser</th>
-            <th>Plan Status</th><th>Days to Expiry</th><th>Expiry Date</th>
+            <th>Plan Status</th><th>Days to Expiry</th><th>Expiry Date</th><th>Created</th>
           </tr></thead>
           <tbody id="rosterBody"></tbody>
         </table>
@@ -1654,8 +1654,9 @@ function renderRoster() {
       <td><span class="st-pill ${active ? 'st-active' : 'st-expired'}">${active ? 'Active' : 'Expired'}</span></td>
       <td class="${daysCls}">${days == null ? '–' : days}</td>
       <td>${fmtExpiryDate(r.expires_at)}</td>
+      <td>${fmtExpiryDate(r.created_at)}</td>
     </tr>`;
-  }).join('') || `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:22px">No enrollees match your search.</td></tr>`;
+  }).join('') || `<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:22px">No enrollees match your search.</td></tr>`;
   $('rosterNote').textContent = `Total enrolled (this filter): ${fmt(rows.length)} · showing ${fmt(toShow.length)}` +
     (rosterRows.length >= 5000 ? ' (capped at 5,000 — narrow the filters)' : '') +
     ' · excludes inactive policies, yopmail emails and Glad Pharmacy enrollees';
@@ -1664,12 +1665,13 @@ function renderRoster() {
 function downloadRosterCsv() {
   const rows = filterRoster();
   const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  const head = ['Pharmacy', 'Enrollee', 'Phone', 'Plan', 'Canvasser', 'Plan Status', 'Days to Expiry', 'Expiry Date'];
+  const head = ['Pharmacy', 'Enrollee', 'Phone', 'Plan', 'Canvasser', 'Plan Status', 'Days to Expiry', 'Expiry Date', 'Created'];
   const lines = [head.map(esc).join(',')].concat(rows.map(r => [
     r.pharmacy || '', r.enrollee || '', r.phone || '', r.plan || '', r.canvasser || '',
     r.status === 'active' ? 'Active' : 'Expired',
     r.days_to_expiry == null ? '' : r.days_to_expiry,
-    r.expires_at ? String(r.expires_at).slice(0, 10) : ''
+    r.expires_at ? String(r.expires_at).slice(0, 10) : '',
+    r.created_at ? String(r.created_at).slice(0, 10) : ''
   ].map(esc).join(',')));
   const from = $('globalFrom').value, to = $('globalTo').value;
   const tag = [from && 'from' + from, to && 'to' + to].filter(Boolean).join('_') || 'all';
